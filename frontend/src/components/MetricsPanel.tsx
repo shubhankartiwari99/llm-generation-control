@@ -5,9 +5,10 @@ interface MetricsPanelProps {
   instabilityCount: number;
   regenerations: number;
   avgEntropy: number | null;
+  latencyMs?: number;
 }
 
-export default function MetricsPanel({ confidence, instabilityCount, regenerations, avgEntropy }: MetricsPanelProps) {
+export default function MetricsPanel({ confidence, instabilityCount, regenerations, avgEntropy, latencyMs }: MetricsPanelProps) {
   const getConfidenceColor = (conf: number | null) => {
     if (conf === null) return "text-secondary";
     if (conf >= 0.7) return "text-success";
@@ -47,6 +48,13 @@ export default function MetricsPanel({ confidence, instabilityCount, regeneratio
           <div className="metric-label">Avg Entropy</div>
           <div className="metric-value text-secondary">
             {avgEntropy !== null ? avgEntropy.toFixed(2) : "-"}
+          </div>
+        </div>
+
+        <div className="metric-card">
+          <div className="metric-label">Latency</div>
+          <div className="metric-value text-secondary">
+            {latencyMs ? `${(latencyMs / 1000).toFixed(1)}s` : "-"}
           </div>
         </div>
       </div>

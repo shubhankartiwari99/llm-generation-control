@@ -124,19 +124,42 @@ def load_mistral_7b() -> Tuple[PreTrainedModel, PreTrainedTokenizerBase]:
             "Mistral 7B requires Apple MPS. No automatic fallback is provided."
         )
 
-    tokenizer = AutoTokenizer.from_pretrained(model_name)
-    if tokenizer.pad_token is None and tokenizer.eos_token is not None:
-        tokenizer.pad_token = tokenizer.eos_token
+    import time
+    print(f"Loading {model_name} on MPS...")
+    start_time = time.time()
 
-    model = AutoModelForCausalLM.from_pretrained(
-        model_name,
-        torch_dtype=torch.float16,
-        device_map={"": "mps"},
-        trust_remote_code=False,
-    )
-    model.eval()
+    torch.set_grad_enabled(False)  # Disable gradients for inference
 
-    return model, tokenizer
+    try:
+        tokenizer = AutoTokenizer.from_pretrained(model_name)
+        tokenizer.padding_side = "left"
+        if tokenizer.pad_token is None and tokenizer.eos_token is not None:
+            tokenizer.pad_token = tokenizer.eos_token
+
+        model = AutoModelForCausalLM.from_pretrained(
+            model_name,
+            torch_dtype=torch.float16,
+            device_map={"": "mps"},
+            max_memory={"mps": "14GB"},
+            trust_remote_code=False,
+        )
+        model.eval()
+
+        # Warmup run to prevent first-call latency
+        with torch.no_grad():
+            dummy_input = torch.ones(1, 1, dtype=torch.long).to("mps")
+            _ = model(dummy_input)
+
+        print(f"Loaded in {time.time() - start_time:.2f}s")
+
+        return model, tokenizer
+
+    except RuntimeError as e:
+        if "out of memory" in str(e).lower():
+            raise RuntimeError(
+                "Model too large for current memory. Try reducing max_memory or using a smaller model."
+            ) from e
+        raise
 
 
 def load_distilgpt2(

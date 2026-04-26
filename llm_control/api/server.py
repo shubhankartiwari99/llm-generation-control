@@ -32,7 +32,15 @@ async def lifespan(app: FastAPI):
     model, tokenizer = load_mistral_7b()
     state["model"] = model
     state["tokenizer"] = tokenizer
-    print("Model loaded successfully.")
+    
+    print("Warming up model...")
+    import torch
+    try:
+        model(torch.ones(1, 1, dtype=torch.long).to("mps"))
+    except Exception as e:
+        print(f"Warmup warning: {e}")
+        
+    print("Model loaded and warmed up successfully.")
     yield
     state.clear()
 
@@ -59,54 +67,88 @@ class TokenStepResponse(BaseModel):
     token: str
     entropy: float
     instability: Optional[str] = None
+    action: Optional[str] = "continue"
 
 
-class GenerateResponse(BaseModel):
-    output: str
+class ModeResponse(BaseModel):
+    text: str
     steps: list[TokenStepResponse]
     confidence: float
-    regenerations: int
+    regenerations: int = 0
+
+class GenerateResponse(BaseModel):
+    plain: ModeResponse
+    adaptive: ModeResponse
+    latency_ms: int
+    model: str = "mistral-7b"
+    device: str = "mps"
 
 
 @app.post("/generate", response_model=GenerateResponse)
 def generate(req: GenerateRequest):
+    from fastapi import HTTPException
+    import time
+    start_time = time.time()
+
     model = state["model"]
     tokenizer = state["tokenizer"]
 
-    if req.mode == "plain":
-        result = generate_stepwise(model, tokenizer, req.prompt, max_tokens=req.max_tokens, stop_at_eos=True)
-        # Use existing compute_confidence
-        conf_summary = compute_confidence(result.steps, regeneration_count=0)
-    else:
-        result = generate_adaptive(model, tokenizer, req.prompt, max_tokens=req.max_tokens, verbose=False)
-        conf_summary = compute_confidence(result.steps, regeneration_count=result.regeneration_count)
+    try:
+        # Run plain first
+        plain_res = generate_stepwise(model, tokenizer, req.prompt, max_tokens=req.max_tokens, stop_at_eos=True)
+        plain_conf = compute_confidence(plain_res.steps, regeneration_count=0)
+        plain_steps = [{"token": s.token_text, "entropy": s.entropy, "instability": s.instability, "action": s.action} for s in plain_res.steps]
 
-    steps_res = [
-        TokenStepResponse(
-            token=s.token_text,
-            entropy=s.entropy,
-            instability=s.instability,
-        )
-        for s in result.steps
-    ]
+        # Run adaptive second (sequential to save memory)
+        adapt_res = generate_adaptive(model, tokenizer, req.prompt, max_tokens=req.max_tokens, verbose=False)
+        adapt_conf = compute_confidence(adapt_res.steps, regeneration_count=adapt_res.regeneration_count)
+        adapt_steps = [{"token": s.token_text, "entropy": s.entropy, "instability": s.instability, "action": s.action} for s in adapt_res.steps]
+
+    except RuntimeError as e:
+        if "MPS out of memory" in str(e):
+            raise HTTPException(status_code=500, detail="Model too large for current memory")
+        raise e
+
+    latency_ms = int((time.time() - start_time) * 1000)
+
+    plain_obj = ModeResponse(
+        text=plain_res.generated_text,
+        steps=plain_steps,
+        confidence=plain_conf.confidence,
+        regenerations=0
+    )
+    
+    adapt_obj = ModeResponse(
+        text=adapt_res.generated_text,
+        steps=adapt_steps,
+        confidence=adapt_conf.confidence,
+        regenerations=getattr(adapt_res, "regeneration_count", 0)
+    )
 
     response_data = {
-        "output": result.generated_text,
-        "steps": [{"token": s.token, "entropy": s.entropy, "instability": s.instability} for s in steps_res],
-        "confidence": conf_summary.confidence,
-        "regenerations": getattr(result, "regeneration_count", 0),
+        "plain": plain_obj.dict(),
+        "adaptive": adapt_obj.dict(),
+        "latency_ms": latency_ms,
+        "model": "mistral-7b",
+        "device": "mps"
     }
 
-    storage.log_run(prompt=req.prompt, mode=req.mode, response_data=response_data)
+    storage.log_run(prompt=req.prompt, mode="compare", response_data=response_data)
 
     return GenerateResponse(
-        output=result.generated_text,
-        steps=steps_res,
-        confidence=conf_summary.confidence,
-        regenerations=getattr(result, "regeneration_count", 0),
+        plain=plain_obj,
+        adaptive=adapt_obj,
+        latency_ms=latency_ms,
+        model="mistral-7b",
+        device="mps",
     )
 
 
 @app.get("/health")
 def health_check():
-    return {"status": "ok", "model_loaded": "model" in state}
+    return {
+        "status": "ok",
+        "model_loaded": "model" in state,
+        "model": "mistral-7b" if "model" in state else None,
+        "device": "mps" if "model" in state else None,
+    }

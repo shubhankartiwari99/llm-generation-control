@@ -65,6 +65,7 @@ def generate_adaptive(
                 token_probability=float(probs[0, token_id].item()),
                 entropy=entropy,
                 instability=instability,
+                action=decision.action,
             )
             all_steps.append(step)
 

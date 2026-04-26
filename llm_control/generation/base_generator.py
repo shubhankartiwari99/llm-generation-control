@@ -23,6 +23,7 @@ class TokenStep:
     token_probability: float
     entropy: float
     instability: Optional[str] = None
+    action: Optional[str] = "continue"
 
 
 @dataclass

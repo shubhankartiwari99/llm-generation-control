@@ -18,8 +18,9 @@ export default function StepTable({ steps }: StepTableProps) {
           <tr style={{ borderBottom: "1px solid var(--border)", textAlign: "left" }}>
             <th style={{ padding: "0.75rem 0.5rem", width: "15%" }}>Step</th>
             <th style={{ padding: "0.75rem 0.5rem", width: "45%" }}>Token</th>
-            <th style={{ padding: "0.75rem 0.5rem", width: "20%" }}>Entropy</th>
+            <th style={{ padding: "0.75rem 0.5rem", width: "10%" }}>Entropy</th>
             <th style={{ padding: "0.75rem 0.5rem", width: "20%" }}>⚠️ Alert</th>
+            <th style={{ padding: "0.75rem 0.5rem", width: "15%" }}>Action</th>
           </tr>
         </thead>
         <tbody>
@@ -52,6 +53,9 @@ export default function StepTable({ steps }: StepTableProps) {
                 </td>
                 <td style={{ padding: "0.5rem", color: "var(--danger)" }}>
                   {hasInstability ? step.instability : ""}
+                </td>
+                <td style={{ padding: "0.5rem", color: step.action !== "continue" ? "var(--warning)" : "var(--text-secondary)" }}>
+                  {step.action || "continue"}
                 </td>
               </tr>
             );

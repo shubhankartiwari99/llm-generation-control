@@ -61,6 +61,7 @@ def compute_confidence(step_trace, regeneration_count: int = 0) -> ConfidenceSum
         instability_count=instability_count,
         regeneration_count=regeneration_count,
         stable=stable,
+        classification=classification,
         summary=summary,
     )
 

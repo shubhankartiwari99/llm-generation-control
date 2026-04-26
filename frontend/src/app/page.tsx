@@ -12,7 +12,6 @@ import RecentRunsPanel from "@/components/RecentRunsPanel";
 import SectionHeader from "@/components/ui/SectionHeader";
 import StatusBanner from "@/components/ui/StatusBanner";
 import { GenerateResponse, RecentRun, RecentRunsResponse, TokenStep } from "@/types";
-import { apiUrl } from "@/lib/api";
 
 export default function Home() {
   const [prompt, setPrompt] = useState("Write only blank lines");
@@ -26,7 +25,7 @@ export default function Home() {
   const fetchRecentRuns = async () => {
     setIsHistoryLoading(true);
     try {
-      const res = await fetch(apiUrl("/runs/recent?limit=8"));
+      const res = await fetch("/api/runs/recent?limit=8");
       if (!res.ok) return;
       const result: RecentRunsResponse = await res.json();
       setRecentRuns(result.runs || []);
@@ -43,7 +42,7 @@ export default function Home() {
     setErrorMessage(null);
     
     try {
-      const res = await fetch(apiUrl("/generate"), {
+      const res = await fetch("/api/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

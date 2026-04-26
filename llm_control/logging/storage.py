@@ -63,3 +63,22 @@ class RunStorage:
             f.write(json.dumps(summary_data) + "\n")
             
         return trace_id
+
+    def get_recent_runs(self, limit: int = 10) -> list[Dict[str, Any]]:
+        """Return the most recent run summaries from runs.jsonl."""
+        if not self.runs_file.exists():
+            return []
+
+        entries: list[Dict[str, Any]] = []
+        with open(self.runs_file, "r", encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    entries.append(json.loads(line))
+                except json.JSONDecodeError:
+                    # Skip malformed lines rather than failing the endpoint.
+                    continue
+
+        return list(reversed(entries[-limit:]))

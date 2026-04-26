@@ -3,11 +3,13 @@
 from __future__ import annotations
 
 import sys
+import time
 from pathlib import Path
 from contextlib import asynccontextmanager
+from collections import defaultdict, deque
 from typing import Literal, Optional
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
@@ -25,6 +27,9 @@ from llm_control.logging.storage import RunStorage
 # Global state for model
 state = {}
 storage = RunStorage()
+rate_limit_window_s = 60
+rate_limit_max_requests = 6
+request_history: dict[str, deque[float]] = defaultdict(deque)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -85,9 +90,30 @@ class GenerateResponse(BaseModel):
     device: str = "mps"
 
 
+class RecentRunsResponse(BaseModel):
+    runs: list[dict]
+
+
+def enforce_rate_limit(request: Request) -> None:
+    client_ip = request.client.host if request.client else "unknown"
+    now = time.time()
+    history = request_history[client_ip]
+
+    while history and now - history[0] > rate_limit_window_s:
+        history.popleft()
+
+    if len(history) >= rate_limit_max_requests:
+        raise HTTPException(
+            status_code=429,
+            detail=f"Rate limit exceeded: max {rate_limit_max_requests} requests per {rate_limit_window_s}s",
+        )
+
+    history.append(now)
+
+
 @app.post("/generate", response_model=GenerateResponse)
-def generate(req: GenerateRequest):
-    import time
+def generate(req: GenerateRequest, request: Request):
+    enforce_rate_limit(request)
     start_time = time.time()
 
     model = state["model"]
@@ -186,6 +212,13 @@ def generate(req: GenerateRequest):
         model="mistral-7b",
         device="mps",
     )
+
+
+@app.get("/runs/recent", response_model=RecentRunsResponse)
+def recent_runs(limit: int = 10):
+    safe_limit = max(1, min(limit, 50))
+    runs = storage.get_recent_runs(limit=safe_limit)
+    return RecentRunsResponse(runs=runs)
 
 
 @app.get("/health")

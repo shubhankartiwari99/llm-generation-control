@@ -8,13 +8,26 @@ import EntropyChart from "@/components/EntropyChart";
 import MetricsPanel from "@/components/MetricsPanel";
 import StepTable from "@/components/StepTable";
 import ExplanationPanel from "@/components/ExplanationPanel";
-import { GenerateResponse, TokenStep } from "@/types";
+import RecentRunsPanel from "@/components/RecentRunsPanel";
+import { GenerateResponse, RecentRun, RecentRunsResponse, TokenStep } from "@/types";
 
 export default function Home() {
   const [prompt, setPrompt] = useState("Write only blank lines");
   const [mode, setMode] = useState("compare");
   const [isLoading, setIsLoading] = useState(false);
   const [data, setData] = useState<GenerateResponse | null>(null);
+  const [recentRuns, setRecentRuns] = useState<RecentRun[]>([]);
+
+  const fetchRecentRuns = async () => {
+    try {
+      const res = await fetch("http://127.0.0.1:8000/runs/recent?limit=8");
+      if (!res.ok) return;
+      const result: RecentRunsResponse = await res.json();
+      setRecentRuns(result.runs || []);
+    } catch {
+      // Keep dashboard usable even if history endpoint is unavailable.
+    }
+  };
 
   const runInference = async () => {
     setIsLoading(true);
@@ -38,6 +51,7 @@ export default function Home() {
       
       const result = await res.json();
       setData(result);
+      await fetchRecentRuns();
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "Unknown error";
       console.error("Inference failed:", err);
@@ -89,8 +103,8 @@ export default function Home() {
       <div style={{ marginTop: "2rem" }}>
         <h3 style={{ marginBottom: "1rem" }}>Entropy Trace Comparison</h3>
         <EntropyChart 
-          plainSteps={data?.plain.steps} 
-          adaptiveSteps={data?.adaptive.steps} 
+          plainSteps={data?.plain?.steps}
+          adaptiveSteps={data?.adaptive?.steps}
         />
       </div>
 
@@ -136,6 +150,13 @@ export default function Home() {
           </div>
         </>
       )}
+
+      <div style={{ marginTop: "2rem", display: "flex", justifyContent: "flex-end" }}>
+        <button onClick={() => void fetchRecentRuns()} disabled={isLoading}>
+          Refresh Run History
+        </button>
+      </div>
+      <RecentRunsPanel runs={recentRuns} />
     </main>
   );
 }

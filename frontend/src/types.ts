@@ -41,3 +41,18 @@ export interface GenerateResponse {
   model: string;
   device: string;
 }
+
+export interface RecentRun {
+  trace_id: string;
+  timestamp: string;
+  prompt: string;
+  mode: string;
+  confidence: number | null;
+  regenerations: number;
+  instabilities: number;
+  summary_metrics?: GenerateSummary;
+}
+
+export interface RecentRunsResponse {
+  runs: RecentRun[];
+}

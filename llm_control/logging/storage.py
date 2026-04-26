@@ -35,14 +35,29 @@ class RunStorage:
             json.dump(trace_data, f, indent=2)
             
         # 2. Append to runs summary log
+        mode_data = response_data.get(mode)
+        if mode == "compare":
+            mode_data = response_data.get("adaptive") or response_data.get("plain")
+
+        run_summary = response_data.get("summary", {})
+        confidence = mode_data.get("confidence") if mode_data else None
+        regenerations = mode_data.get("regenerations") if mode_data else 0
+
+        instabilities = 0
+        if mode == "compare":
+            instabilities = run_summary.get("adaptive", {}).get("instabilities", 0)
+        elif mode_data:
+            instabilities = sum(1 for step in mode_data.get("steps", []) if step.get("instability"))
+
         summary_data = {
             "trace_id": trace_id,
             "timestamp": timestamp,
             "prompt": prompt[:50] + "..." if len(prompt) > 50 else prompt,
             "mode": mode,
-            "confidence": response_data.get("confidence"),
-            "regenerations": response_data.get("regenerations"),
-            "instabilities": sum(1 for step in response_data.get("steps", []) if step.get("instability"))
+            "confidence": confidence,
+            "regenerations": regenerations,
+            "instabilities": instabilities,
+            "summary_metrics": run_summary
         }
         with open(self.runs_file, "a", encoding="utf-8") as f:
             f.write(json.dumps(summary_data) + "\n")

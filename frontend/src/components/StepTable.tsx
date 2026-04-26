@@ -28,9 +28,16 @@ export default function StepTable({ steps }: StepTableProps) {
             const hasInstability = step.instability !== null;
             const isLowEntropy = step.entropy < 1;
             const isHighEntropy = step.entropy > 5;
+            const isRegeneration = step.action === "regenerate";
 
-            let rowStyle = { borderBottom: "1px solid rgba(255,255,255,0.05)", backgroundColor: "transparent" };
-            if (hasInstability) rowStyle.backgroundColor = "rgba(239, 68, 68, 0.1)"; // Very faint red
+            const rowStyle = {
+              borderBottom: "1px solid rgba(255,255,255,0.05)",
+              backgroundColor: isRegeneration
+                ? "rgba(34, 197, 94, 0.12)"
+                : hasInstability
+                  ? "rgba(239, 68, 68, 0.1)"
+                  : "transparent",
+            };
             
             let entropyColor = "var(--text-primary)";
             if (isLowEntropy) entropyColor = "var(--warning)";
@@ -52,10 +59,10 @@ export default function StepTable({ steps }: StepTableProps) {
                   {step.entropy.toFixed(3)}
                 </td>
                 <td style={{ padding: "0.5rem", color: "var(--danger)" }}>
-                  {hasInstability ? step.instability : ""}
+                  {hasInstability ? `🔴 ${step.instability}` : isLowEntropy ? "🟡 low_entropy" : ""}
                 </td>
                 <td style={{ padding: "0.5rem", color: step.action !== "continue" ? "var(--warning)" : "var(--text-secondary)" }}>
-                  {step.action || "continue"}
+                  {isRegeneration ? "🟢 regenerate" : step.action || "continue"}
                 </td>
               </tr>
             );

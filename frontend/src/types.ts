@@ -12,9 +12,31 @@ export interface ModeResponse {
   regenerations: number;
 }
 
+export interface ModeSummary {
+  confidence: number;
+  instabilities: number;
+  regenerations: number;
+  avg_entropy: number;
+  max_entropy: number;
+  min_entropy: number;
+}
+
+export interface CompareSummary {
+  delta_confidence: number;
+  instabilities_reduced_by: number;
+  regeneration_gain: number;
+}
+
+export interface GenerateSummary {
+  plain: Partial<ModeSummary>;
+  adaptive: Partial<ModeSummary>;
+  compare: Partial<CompareSummary>;
+}
+
 export interface GenerateResponse {
-  plain: ModeResponse;
-  adaptive: ModeResponse;
+  plain: ModeResponse | null;
+  adaptive: ModeResponse | null;
+  summary: GenerateSummary;
   latency_ms: number;
   model: string;
   device: string;

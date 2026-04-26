@@ -5,11 +5,11 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 from contextlib import asynccontextmanager
-from typing import Optional
+from typing import Literal, Optional
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
@@ -58,9 +58,9 @@ app.add_middleware(
 
 
 class GenerateRequest(BaseModel):
-    prompt: str
-    max_tokens: int = 50
-    mode: str = "adaptive"  # "plain" or "adaptive"
+    prompt: str = Field(..., max_length=2000)
+    max_tokens: int = Field(default=50, le=100)
+    mode: Literal["compare", "plain", "adaptive"] = "compare"
 
 
 class TokenStepResponse(BaseModel):
@@ -77,8 +77,9 @@ class ModeResponse(BaseModel):
     regenerations: int = 0
 
 class GenerateResponse(BaseModel):
-    plain: ModeResponse
-    adaptive: ModeResponse
+    plain: Optional[ModeResponse] = None
+    adaptive: Optional[ModeResponse] = None
+    summary: dict
     latency_ms: int
     model: str = "mistral-7b"
     device: str = "mps"
@@ -86,58 +87,101 @@ class GenerateResponse(BaseModel):
 
 @app.post("/generate", response_model=GenerateResponse)
 def generate(req: GenerateRequest):
-    from fastapi import HTTPException
     import time
     start_time = time.time()
 
     model = state["model"]
     tokenizer = state["tokenizer"]
 
-    try:
-        # Run plain first
-        plain_res = generate_stepwise(model, tokenizer, req.prompt, max_tokens=req.max_tokens, stop_at_eos=True)
-        plain_conf = compute_confidence(plain_res.steps, regeneration_count=0)
-        plain_steps = [{"token": s.token_text, "entropy": s.entropy, "instability": s.instability, "action": s.action} for s in plain_res.steps]
+    prompt_length = len(req.prompt.strip())
+    if prompt_length == 0:
+        raise HTTPException(status_code=400, detail="Prompt cannot be empty")
+    if prompt_length > 2000:
+        raise HTTPException(status_code=400, detail="Prompt too long (max 2000 chars)")
+    if req.max_tokens > 100:
+        raise HTTPException(status_code=400, detail="max_tokens too large (max 100)")
+    
+    plain_obj = None
+    adapt_obj = None
+    plain_conf = None
+    adapt_conf = None
+    plain_steps = []
+    adapt_steps = []
 
-        # Run adaptive second (sequential to save memory)
-        adapt_res = generate_adaptive(model, tokenizer, req.prompt, max_tokens=req.max_tokens, verbose=False)
-        adapt_conf = compute_confidence(adapt_res.steps, regeneration_count=adapt_res.regeneration_count)
-        adapt_steps = [{"token": s.token_text, "entropy": s.entropy, "instability": s.instability, "action": s.action} for s in adapt_res.steps]
+    try:
+        if req.mode in ["compare", "plain"]:
+            plain_res = generate_stepwise(model, tokenizer, req.prompt, max_tokens=req.max_tokens, stop_at_eos=True)
+            plain_conf = compute_confidence(plain_res.steps, regeneration_count=0)
+            plain_steps = [{"token": s.token_text, "entropy": s.entropy, "instability": s.instability, "action": s.action} for s in plain_res.steps]
+            plain_obj = ModeResponse(
+                text=plain_res.generated_text,
+                steps=plain_steps,
+                confidence=plain_conf.confidence,
+                regenerations=0
+            )
+
+        if req.mode in ["compare", "adaptive"]:
+            adapt_res = generate_adaptive(model, tokenizer, req.prompt, max_tokens=req.max_tokens, verbose=False)
+            adapt_conf = compute_confidence(adapt_res.steps, regeneration_count=adapt_res.regeneration_count)
+            adapt_steps = [{"token": s.token_text, "entropy": s.entropy, "instability": s.instability, "action": s.action} for s in adapt_res.steps]
+            adapt_obj = ModeResponse(
+                text=adapt_res.generated_text,
+                steps=adapt_steps,
+                confidence=adapt_conf.confidence,
+                regenerations=getattr(adapt_res, "regeneration_count", 0)
+            )
 
     except RuntimeError as e:
-        if "MPS out of memory" in str(e):
+        if "MPS out of memory" in str(e) or "out of memory" in str(e).lower():
             raise HTTPException(status_code=500, detail="Model too large for current memory")
         raise e
 
     latency_ms = int((time.time() - start_time) * 1000)
+        
+    def compute_mode_summary(steps: list[dict], confidence: float | None, regenerations: int = 0) -> dict:
+        if confidence is None:
+            return {}
+        entropies = [s["entropy"] for s in steps] if steps else []
+        return {
+            "confidence": confidence,
+            "instabilities": sum(1 for s in steps if s["instability"]),
+            "regenerations": regenerations,
+            "avg_entropy": (sum(entropies) / len(entropies)) if entropies else 0.0,
+            "max_entropy": max(entropies) if entropies else 0.0,
+            "min_entropy": min(entropies) if entropies else 0.0,
+        }
 
-    plain_obj = ModeResponse(
-        text=plain_res.generated_text,
-        steps=plain_steps,
-        confidence=plain_conf.confidence,
-        regenerations=0
-    )
-    
-    adapt_obj = ModeResponse(
-        text=adapt_res.generated_text,
-        steps=adapt_steps,
-        confidence=adapt_conf.confidence,
-        regenerations=getattr(adapt_res, "regeneration_count", 0)
-    )
+    summary = {
+        "plain": compute_mode_summary(plain_steps, plain_conf.confidence if plain_conf else None, 0),
+        "adaptive": compute_mode_summary(
+            adapt_steps,
+            adapt_conf.confidence if adapt_conf else None,
+            adapt_obj.regenerations if adapt_obj else 0,
+        ),
+        "compare": {},
+    }
+    if plain_conf and adapt_conf:
+        summary["compare"] = {
+            "delta_confidence": adapt_conf.confidence - plain_conf.confidence,
+            "instabilities_reduced_by": summary["plain"].get("instabilities", 0) - summary["adaptive"].get("instabilities", 0),
+            "regeneration_gain": summary["adaptive"].get("regenerations", 0) - summary["plain"].get("regenerations", 0),
+        }
 
     response_data = {
-        "plain": plain_obj.dict(),
-        "adaptive": adapt_obj.dict(),
+        "plain": plain_obj.dict() if plain_obj else None,
+        "adaptive": adapt_obj.dict() if adapt_obj else None,
         "latency_ms": latency_ms,
         "model": "mistral-7b",
-        "device": "mps"
+        "device": "mps",
+        "summary": summary
     }
 
-    storage.log_run(prompt=req.prompt, mode="compare", response_data=response_data)
+    storage.log_run(prompt=req.prompt, mode=req.mode, response_data=response_data)
 
     return GenerateResponse(
         plain=plain_obj,
         adaptive=adapt_obj,
+        summary=summary,
         latency_ms=latency_ms,
         model="mistral-7b",
         device="mps",

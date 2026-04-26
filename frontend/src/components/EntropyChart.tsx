@@ -18,6 +18,24 @@ interface EntropyChartProps {
   adaptiveSteps?: TokenStep[];
 }
 
+interface ChartPoint {
+  step: number;
+  plainEntropy?: number;
+  plainToken: string;
+  plainInstability?: string | null;
+  adaptiveEntropy?: number;
+  adaptiveToken: string;
+  adaptiveInstability?: string | null;
+  adaptiveAction?: string | null;
+}
+
+interface DotRenderProps {
+  cx?: number;
+  cy?: number;
+  index: number;
+  payload: ChartPoint;
+}
+
 export default function EntropyChart({ plainSteps, adaptiveSteps }: EntropyChartProps) {
   if ((!plainSteps || plainSteps.length === 0) && (!adaptiveSteps || adaptiveSteps.length === 0)) {
     return (
@@ -29,7 +47,7 @@ export default function EntropyChart({ plainSteps, adaptiveSteps }: EntropyChart
 
   // Merge the two step arrays by index for the Recharts data format
   const maxLength = Math.max(plainSteps?.length || 0, adaptiveSteps?.length || 0);
-  const data = [];
+  const data: ChartPoint[] = [];
   
   for (let i = 0; i < maxLength; i++) {
     const pStep = plainSteps?.[i];
@@ -43,6 +61,7 @@ export default function EntropyChart({ plainSteps, adaptiveSteps }: EntropyChart
       adaptiveEntropy: aStep?.entropy,
       adaptiveToken: aStep?.token?.trim() || (aStep ? "\\n" : ""),
       adaptiveInstability: aStep?.instability,
+      adaptiveAction: aStep?.action,
     });
   }
 
@@ -76,9 +95,10 @@ export default function EntropyChart({ plainSteps, adaptiveSteps }: EntropyChart
                 name="plainEntropy"
                 stroke="#94a3b8" // Grey for plain
                 strokeWidth={2}
-                dot={(props: any) => {
+                dot={(props: DotRenderProps) => {
                   const { cx, cy, payload } = props;
                   if (payload.plainInstability) return <circle key={`p-${props.index}`} cx={cx} cy={cy} r={6} fill="#ef4444" stroke="none" />;
+                  if (payload.plainEntropy !== undefined && payload.plainEntropy < 1) return <circle key={`p-${props.index}`} cx={cx} cy={cy} r={4} fill="#f59e0b" stroke="none" />;
                   return <circle key={`p-${props.index}`} cx={cx} cy={cy} r={3} fill="#94a3b8" stroke="none" />;
                 }}
                 activeDot={{ r: 6 }}
@@ -92,9 +112,11 @@ export default function EntropyChart({ plainSteps, adaptiveSteps }: EntropyChart
                 name="adaptiveEntropy"
                 stroke="#6366f1" // Indigo for adaptive
                 strokeWidth={2}
-                dot={(props: any) => {
+                dot={(props: DotRenderProps) => {
                   const { cx, cy, payload } = props;
                   if (payload.adaptiveInstability) return <circle key={`a-${props.index}`} cx={cx} cy={cy} r={6} fill="#ef4444" stroke="none" />;
+                  if (payload.adaptiveAction === "regenerate") return <circle key={`a-${props.index}`} cx={cx} cy={cy} r={5} fill="#22c55e" stroke="none" />;
+                  if (payload.adaptiveEntropy !== undefined && payload.adaptiveEntropy < 1) return <circle key={`a-${props.index}`} cx={cx} cy={cy} r={4} fill="#f59e0b" stroke="none" />;
                   return <circle key={`a-${props.index}`} cx={cx} cy={cy} r={3} fill="#6366f1" stroke="none" />;
                 }}
                 activeDot={{ r: 6 }}

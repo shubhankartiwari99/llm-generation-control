@@ -15,6 +15,7 @@ export default function ModeToggle({ mode, setMode, isLoading }: ModeToggleProps
         onChange={(e) => setMode(e.target.value)}
         disabled={isLoading}
       >
+        <option value="compare">Compare (Plain + Adaptive)</option>
         <option value="plain">Plain (No Control)</option>
         <option value="adaptive">Adaptive (Closed-Loop)</option>
       </select>

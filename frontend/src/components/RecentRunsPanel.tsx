@@ -1,22 +1,32 @@
 "use client";
 
+import { Activity } from "lucide-react";
 import { RecentRun } from "@/types";
 
 interface RecentRunsPanelProps {
   runs: RecentRun[];
+  isLoading?: boolean;
 }
 
-export default function RecentRunsPanel({ runs }: RecentRunsPanelProps) {
+export default function RecentRunsPanel({ runs, isLoading = false }: RecentRunsPanelProps) {
   return (
-    <div className="glass-panel panel-content" style={{ marginTop: "2rem" }}>
+    <div className="glass-panel panel-content mt-2">
       <h3 style={{ marginBottom: "1rem" }}>Recent Runs</h3>
-      {runs.length === 0 ? (
-        <div className="text-secondary">No run history yet.</div>
+      {isLoading ? (
+        <div className="empty-state">
+          <Activity size={18} />
+          <span>Loading run history...</span>
+        </div>
+      ) : runs.length === 0 ? (
+        <div className="empty-state">
+          <Activity size={18} />
+          <span>No run history yet. Run inference to populate history.</span>
+        </div>
       ) : (
-        <div style={{ overflowX: "auto" }}>
-          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.9rem" }}>
+        <div className="scroll-x">
+          <table className="table-base">
             <thead>
-              <tr style={{ borderBottom: "1px solid var(--border)", textAlign: "left" }}>
+              <tr className="table-head-row">
                 <th style={{ padding: "0.6rem 0.5rem" }}>Prompt</th>
                 <th style={{ padding: "0.6rem 0.5rem" }}>Mode</th>
                 <th style={{ padding: "0.6rem 0.5rem" }}>Δ Confidence</th>

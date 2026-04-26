@@ -67,7 +67,12 @@ export default function EntropyChart({ plainSteps, adaptiveSteps }: EntropyChart
 
   return (
     <div className="glass-panel panel-content" style={{ height: "400px" }}>
-      <h3 style={{ marginBottom: "1rem" }}>Entropy Trace Comparison</h3>
+      <div className="section-header">
+        <h3 style={{ marginBottom: "1rem" }}>Entropy Trace Comparison</h3>
+        <div className="small-note" aria-label="chart legend">
+          🔴 instability · 🟡 low entropy · 🟢 regeneration
+        </div>
+      </div>
       <div style={{ flex: 1, width: "100%", minHeight: 0 }}>
         <ResponsiveContainer width="100%" height="100%">
           <LineChart data={data} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>

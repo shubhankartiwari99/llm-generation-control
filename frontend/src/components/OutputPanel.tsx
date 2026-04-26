@@ -1,5 +1,6 @@
 "use client";
 
+import { FileText } from "lucide-react";
 import { TokenStep } from "@/types";
 
 interface OutputPanelProps {
@@ -37,7 +38,12 @@ export default function OutputPanel({ title, output, steps, isLoading }: OutputP
             );
           })
         ) : (
-          output || <span className="text-secondary">No output yet...</span>
+          output || (
+            <div className="empty-state">
+              <FileText size={18} />
+              <span>No output yet. Run inference to view generated tokens.</span>
+            </div>
+          )
         )}
       </div>
     </div>

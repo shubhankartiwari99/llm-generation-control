@@ -7,10 +7,13 @@ interface ModeToggleProps {
 }
 
 export default function ModeToggle({ mode, setMode, isLoading }: ModeToggleProps) {
+  const modeSelectId = "mode-select";
+
   return (
     <div className="controls-row">
-      <label style={{ fontWeight: 500 }}>Decoding Mode:</label>
+      <label htmlFor={modeSelectId} style={{ fontWeight: 500 }}>Decoding Mode:</label>
       <select 
+        id={modeSelectId}
         value={mode} 
         onChange={(e) => setMode(e.target.value)}
         disabled={isLoading}

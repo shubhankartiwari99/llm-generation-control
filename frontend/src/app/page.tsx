@@ -9,7 +9,10 @@ import MetricsPanel from "@/components/MetricsPanel";
 import StepTable from "@/components/StepTable";
 import ExplanationPanel from "@/components/ExplanationPanel";
 import RecentRunsPanel from "@/components/RecentRunsPanel";
+import SectionHeader from "@/components/ui/SectionHeader";
+import StatusBanner from "@/components/ui/StatusBanner";
 import { GenerateResponse, RecentRun, RecentRunsResponse, TokenStep } from "@/types";
+import { apiUrl } from "@/lib/api";
 
 export default function Home() {
   const [prompt, setPrompt] = useState("Write only blank lines");
@@ -17,24 +20,30 @@ export default function Home() {
   const [isLoading, setIsLoading] = useState(false);
   const [data, setData] = useState<GenerateResponse | null>(null);
   const [recentRuns, setRecentRuns] = useState<RecentRun[]>([]);
+  const [isHistoryLoading, setIsHistoryLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const fetchRecentRuns = async () => {
+    setIsHistoryLoading(true);
     try {
-      const res = await fetch("http://127.0.0.1:8000/runs/recent?limit=8");
+      const res = await fetch(apiUrl("/runs/recent?limit=8"));
       if (!res.ok) return;
       const result: RecentRunsResponse = await res.json();
       setRecentRuns(result.runs || []);
     } catch {
       // Keep dashboard usable even if history endpoint is unavailable.
+    } finally {
+      setIsHistoryLoading(false);
     }
   };
 
   const runInference = async () => {
     setIsLoading(true);
     setData(null);
+    setErrorMessage(null);
     
     try {
-      const res = await fetch("http://127.0.0.1:8000/generate", {
+      const res = await fetch(apiUrl("/generate"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -45,8 +54,14 @@ export default function Home() {
       });
       
       if (!res.ok) {
-        const errData = await res.json();
-        throw new Error(errData.detail || `API error: ${res.status}`);
+        let detail = `API error: ${res.status}`;
+        try {
+          const errData = await res.json();
+          detail = errData.detail || detail;
+        } catch {
+          // Use default message if JSON parsing fails.
+        }
+        throw new Error(detail);
       }
       
       const result = await res.json();
@@ -55,7 +70,7 @@ export default function Home() {
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "Unknown error";
       console.error("Inference failed:", err);
-      alert(`Failed to run inference: ${message}`);
+      setErrorMessage(message);
     } finally {
       setIsLoading(false);
     }
@@ -68,10 +83,16 @@ export default function Home() {
 
   return (
     <main className="container">
-      <div style={{ textAlign: "center", marginBottom: "1.5rem" }}>
+      <div className="hero-header">
         <h1>LLM Generation Control Dashboard</h1>
         <p className="text-secondary">Interactive control layer with real-time hardware observability (Mistral 7B on MPS).</p>
       </div>
+
+      {errorMessage && (
+        <StatusBanner tone="error">
+          Generation failed: {errorMessage}
+        </StatusBanner>
+      )}
 
       <PromptInput 
         prompt={prompt} 
@@ -79,12 +100,14 @@ export default function Home() {
         onRun={runInference} 
         isLoading={isLoading} 
       />
-      <div style={{ marginTop: "1rem" }}>
+      <div className="mt-1">
         <ModeToggle mode={mode} setMode={setMode} isLoading={isLoading} />
       </div>
 
-      {/* Phase 2: Side-by-Side Comparison Output */}
-      <div className="panels-grid" style={{ marginTop: "2rem" }}>
+      <div className="section mt-2">
+        <SectionHeader title="Generation Output" subtitle={`Mode: ${mode}`} />
+      </div>
+      <div className="panels-grid">
         <OutputPanel 
           title="Plain Generation" 
           output={data?.plain?.text || ""} 
@@ -99,9 +122,8 @@ export default function Home() {
         />
       </div>
 
-      {/* Entropy Comparison Chart */}
-      <div style={{ marginTop: "2rem" }}>
-        <h3 style={{ marginBottom: "1rem" }}>Entropy Trace Comparison</h3>
+      <div className="section mt-2">
+        <SectionHeader title="Trace Analysis" subtitle="Token-level entropy + interventions" />
         <EntropyChart 
           plainSteps={data?.plain?.steps}
           adaptiveSteps={data?.adaptive?.steps}
@@ -111,7 +133,7 @@ export default function Home() {
       {data && (
         <>
           {/* Step Trace Table - Showing Adaptive trace details */}
-          <div className="glass-panel panel-content" style={{ marginTop: "2rem", maxHeight: "400px", overflowY: "auto" }}>
+          <div className="glass-panel panel-content mt-2" style={{ maxHeight: "400px", overflowY: "auto" }}>
             <h3 style={{ margin: "0 0 1rem 0" }}>Adaptive Step Trace</h3>
             <StepTable steps={data.adaptive?.steps || []} />
           </div>
@@ -151,12 +173,12 @@ export default function Home() {
         </>
       )}
 
-      <div style={{ marginTop: "2rem", display: "flex", justifyContent: "flex-end" }}>
+      <div className="actions-end mt-2">
         <button onClick={() => void fetchRecentRuns()} disabled={isLoading}>
-          Refresh Run History
+          {isHistoryLoading ? "Refreshing..." : "Refresh Run History"}
         </button>
       </div>
-      <RecentRunsPanel runs={recentRuns} />
+      <RecentRunsPanel runs={recentRuns} isLoading={isHistoryLoading} />
     </main>
   );
 }

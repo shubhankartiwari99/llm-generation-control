@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import sys
 import time
 from pathlib import Path
@@ -17,7 +18,7 @@ ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from llm_control.model.loader import load_mistral_7b
+from llm_control.model.loader import load_distilgpt2, load_mistral_7b
 from llm_control.generation.base_generator import generate_stepwise
 from llm_control.generation.adaptive_generator import generate_adaptive
 from llm_control.metrics.confidence import compute_confidence
@@ -34,18 +35,38 @@ request_history: dict[str, deque[float]] = defaultdict(deque)
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     print("Loading model...")
-    model, tokenizer = load_mistral_7b()
+    model_name = os.getenv("MODEL_NAME", "mistral-7b").strip().lower()
+    selected_model = "mistral-7b"
+    selected_device = "mps"
+
+    if model_name in {"small", "distilgpt2"}:
+        model, tokenizer = load_distilgpt2(device="cpu")
+        selected_model = "distilgpt2"
+        selected_device = "cpu"
+    else:
+        try:
+            model, tokenizer = load_mistral_7b()
+        except RuntimeError as err:
+            print(f"Mistral load failed: {err}")
+            print("Falling back to distilgpt2 on CPU for local development.")
+            model, tokenizer = load_distilgpt2(device="cpu")
+            selected_model = "distilgpt2"
+            selected_device = "cpu"
+
     state["model"] = model
     state["tokenizer"] = tokenizer
+    state["model_name"] = selected_model
+    state["device"] = selected_device
     
     print("Warming up model...")
     import torch
     try:
-        model(torch.ones(1, 1, dtype=torch.long).to("mps"))
+        warmup_device = "mps" if selected_device == "mps" else "cpu"
+        model(torch.ones(1, 1, dtype=torch.long).to(warmup_device))
     except Exception as e:
         print(f"Warmup warning: {e}")
         
-    print("Model loaded and warmed up successfully.")
+    print(f"Model loaded and warmed up successfully ({selected_model} on {selected_device}).")
     yield
     state.clear()
 
@@ -197,8 +218,8 @@ def generate(req: GenerateRequest, request: Request):
         "plain": plain_obj.dict() if plain_obj else None,
         "adaptive": adapt_obj.dict() if adapt_obj else None,
         "latency_ms": latency_ms,
-        "model": "mistral-7b",
-        "device": "mps",
+        "model": state.get("model_name", "mistral-7b"),
+        "device": state.get("device", "mps"),
         "summary": summary
     }
 
@@ -209,8 +230,8 @@ def generate(req: GenerateRequest, request: Request):
         adaptive=adapt_obj,
         summary=summary,
         latency_ms=latency_ms,
-        model="mistral-7b",
-        device="mps",
+        model=state.get("model_name", "mistral-7b"),
+        device=state.get("device", "mps"),
     )
 
 
@@ -226,6 +247,6 @@ def health_check():
     return {
         "status": "ok",
         "model_loaded": "model" in state,
-        "model": "mistral-7b" if "model" in state else None,
-        "device": "mps" if "model" in state else None,
+        "model": state.get("model_name") if "model" in state else None,
+        "device": state.get("device") if "model" in state else None,
     }

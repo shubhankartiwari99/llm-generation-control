@@ -14,6 +14,8 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from llm_control.generation.adaptive_generator import generate_adaptive
+from llm_control.logging.storage import RunStorage
+from llm_control.metrics.confidence import compute_confidence
 from llm_control.model.loader import load_model
 
 
@@ -39,8 +41,8 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--model",
-        default=os.getenv("MODEL_NAME", "distilgpt2"),
-        help="Hugging Face model id or local model path.",
+        default=os.getenv("MODEL_NAME", "mistral"),
+        help="Model alias: 'mistral' for Mistral-7B or 'small' for distilgpt2.",
     )
     parser.add_argument(
         "--max-new-tokens",
@@ -65,6 +67,11 @@ def build_parser() -> argparse.ArgumentParser:
         default=None if seed_value is None else int(seed_value),
         help="Optional torch seed for reproducible sampling.",
     )
+    parser.add_argument(
+        "--log",
+        action="store_true",
+        help="Persist adaptive generation run metadata and detailed trace to logs/.",
+    )
     return parser
 
 
@@ -87,6 +94,26 @@ def main() -> int:
         prompt=args.prompt,
         max_tokens=args.max_new_tokens,
     )
+
+    if args.log:
+        storage = RunStorage()
+        confidence = compute_confidence(output.steps, regeneration_count=output.regeneration_count)
+        response_data = {
+            "output": output.generated_text,
+            "full_text": output.full_text,
+            "confidence": confidence.confidence,
+            "regenerations": output.regeneration_count,
+            "steps": [
+                {
+                    "token": step.token_text,
+                    "entropy": step.entropy,
+                    "instability": step.instability,
+                }
+                for step in output.steps
+            ],
+        }
+        trace_id = storage.log_run(prompt=args.prompt, mode="adaptive", response_data=response_data)
+        print(f"Logged run to {trace_id}")
 
     print("\nFinal Output:\n")
     print(output.full_text)

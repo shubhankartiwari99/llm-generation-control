@@ -13,6 +13,7 @@ if str(ROOT) not in sys.path:
 
 from llm_control.generation.base_generator import generate_stepwise
 from llm_control.logging.storage import RunStorage
+from llm_control.metrics.confidence import compute_confidence
 from llm_control.model.loader import load_model
 
 
@@ -37,8 +38,8 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--model",
-        default=os.getenv("MODEL_NAME", "distilgpt2"),
-        help="Hugging Face model id or local model path.",
+        default=os.getenv("MODEL_NAME", "mistral"),
+        help="Model alias: 'mistral' for Mistral-7B or 'small' for distilgpt2.",
     )
     parser.add_argument(
         "--max-new-tokens",
@@ -56,6 +57,11 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         default=os.getenv("LOCAL_FILES_ONLY", "").lower() in {"1", "true", "yes"},
         help="Require models to be loaded from local cache or a local path.",
+    )
+    parser.add_argument(
+        "--log",
+        action="store_true",
+        help="Persist generation run metadata and detailed trace to logs/.",
     )
     return parser
 
@@ -75,6 +81,26 @@ def main() -> int:
         prompt=args.prompt,
         max_tokens=args.max_new_tokens,
     )
+
+    if args.log:
+        storage = RunStorage()
+        confidence = compute_confidence(result.steps)
+        response_data = {
+            "output": result.generated_text,
+            "full_text": result.full_text,
+            "confidence": confidence.confidence,
+            "regenerations": 0,
+            "steps": [
+                {
+                    "token": step.token_text,
+                    "entropy": step.entropy,
+                    "instability": step.instability,
+                }
+                for step in result.steps
+            ],
+        }
+        trace_id = storage.log_run(prompt=args.prompt, mode="plain", response_data=response_data)
+        print(f"Logged run to {trace_id}")
 
     print(f"model: {args.model}")
     print(f"prompt: {args.prompt}")

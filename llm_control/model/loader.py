@@ -114,39 +114,46 @@ def load_model_and_tokenizer(
     return model, tokenizer
 
 
-def load_mistral_7b(device: str | None = None) -> Tuple[PreTrainedModel, PreTrainedTokenizerBase]:
-    """Load the Mistral 7B instruct model with the best available local device support."""
+def load_mistral_7b() -> Tuple[PreTrainedModel, PreTrainedTokenizerBase]:
+    """Load the Mistral 7B instruct model natively on MPS in fp16."""
 
     model_name = "mistralai/Mistral-7B-Instruct-v0.1"
-    device = resolve_device(device)
+
+    if not torch.backends.mps.is_available():
+        raise RuntimeError(
+            "Mistral 7B requires Apple MPS. No automatic fallback is provided."
+        )
 
     tokenizer = AutoTokenizer.from_pretrained(model_name)
     if tokenizer.pad_token is None and tokenizer.eos_token is not None:
         tokenizer.pad_token = tokenizer.eos_token
 
-    if device == "cpu":
-        raise RuntimeError(
-            "Mistral 7B on CPU is not supported. Please use MPS or CUDA, or fall back to a smaller model."
-        )
-
-    model_kwargs = {
-        "torch_dtype": torch.float16,
-        "device_map": "auto",
-    }
-
-    if device == "cuda":
-        model_kwargs["load_in_4bit"] = False
-    elif device == "mps":
-        # Use native float16 on Apple Silicon for compatibility.
-        model_kwargs["load_in_4bit"] = False
-
     model = AutoModelForCausalLM.from_pretrained(
         model_name,
+        torch_dtype=torch.float16,
+        device_map={"": "mps"},
         trust_remote_code=False,
-        **model_kwargs,
     )
     model.eval()
+
     return model, tokenizer
+
+
+def load_distilgpt2(
+    *,
+    device: str | None = None,
+    local_files_only: bool = False,
+    trust_remote_code: bool = False,
+) -> Tuple[PreTrainedModel, PreTrainedTokenizerBase]:
+    """Load a small GPT model explicitly for debugging or low-resource runs."""
+
+    config = ModelConfig(
+        model_name="distilgpt2",
+        device=device,
+        local_files_only=local_files_only,
+        trust_remote_code=trust_remote_code,
+    )
+    return load_model_and_tokenizer(config)
 
 
 def load_model(
@@ -156,7 +163,17 @@ def load_model(
     local_files_only: bool = False,
     trust_remote_code: bool = False,
 ) -> Tuple[PreTrainedModel, PreTrainedTokenizerBase]:
-    """Convenience wrapper for the first-generation scripts."""
+    """Explicit model selector; no hidden fallbacks for Mistral."""
+
+    normalized = model_name.strip().lower()
+    if normalized in {"mistral", "mistral-7b"}:
+        return load_mistral_7b()
+    if normalized in {"small", "distilgpt2"}:
+        return load_distilgpt2(
+            device=device,
+            local_files_only=local_files_only,
+            trust_remote_code=trust_remote_code,
+        )
 
     config = ModelConfig(
         model_name=model_name,

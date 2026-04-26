@@ -1,0 +1,36 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+dist/
+build/
+*.egg
+
+# Virtual environments
+venv/
+.venv/
+env/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Environment
+.env
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Model cache (don't commit multi-GB weights)
+*.safetensors
+*.bin
+*.pt
+*.ckpt
+
+# Jupyter
+.ipynb_checkpoints/
+notebooks/*.ipynb

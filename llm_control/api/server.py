@@ -35,7 +35,7 @@ request_history: dict[str, deque[float]] = defaultdict(deque)
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     print("Loading model...")
-    model_name = os.getenv("MODEL_NAME", "mistral-7b").strip().lower()
+    model_name = os.getenv("MODEL_TYPE", os.getenv("MODEL_NAME", "small")).strip().lower()
     selected_model = "mistral-7b"
     selected_device = "mps"
 

@@ -13,6 +13,7 @@ class ConfidenceSummary:
     instability_count: int
     regeneration_count: int
     stable: bool
+    classification: str
     summary: str
 
 
@@ -41,10 +42,17 @@ def compute_confidence(step_trace, regeneration_count: int = 0) -> ConfidenceSum
     confidence = max(0.0, min(1.0, confidence))
 
     stable = instability_count == 0 and regeneration_count == 0 and avg_entropy > 0.0
+    if confidence >= 0.7:
+        classification = "stable generation"
+    elif confidence >= 0.5:
+        classification = "moderate instability"
+    else:
+        classification = "unreliable output"
 
     summary = (
         f"confidence={confidence:.2f}, avg_entropy={avg_entropy:.2f}, "
-        f"instabilities={instability_count}, regenerations={regeneration_count}"
+        f"instabilities={instability_count}, regenerations={regeneration_count}, "
+        f"classification={classification}"
     )
 
     return ConfidenceSummary(

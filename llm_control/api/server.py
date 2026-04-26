@@ -19,10 +19,12 @@ from llm_control.model.loader import load_mistral_7b
 from llm_control.generation.base_generator import generate_stepwise
 from llm_control.generation.adaptive_generator import generate_adaptive
 from llm_control.metrics.confidence import compute_confidence
+from llm_control.logging.storage import RunStorage
 
 
 # Global state for model
 state = {}
+storage = RunStorage()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -87,6 +89,15 @@ def generate(req: GenerateRequest):
         )
         for s in result.steps
     ]
+
+    response_data = {
+        "output": result.generated_text,
+        "steps": [{"token": s.token, "entropy": s.entropy, "instability": s.instability} for s in steps_res],
+        "confidence": conf_summary.confidence,
+        "regenerations": getattr(result, "regeneration_count", 0),
+    }
+
+    storage.log_run(prompt=req.prompt, mode=req.mode, response_data=response_data)
 
     return GenerateResponse(
         output=result.generated_text,

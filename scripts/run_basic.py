@@ -12,6 +12,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from llm_control.generation.base_generator import generate_stepwise
+from llm_control.logging.storage import RunStorage
 from llm_control.model.loader import load_model
 
 

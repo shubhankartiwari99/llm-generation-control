@@ -114,34 +114,37 @@ def load_model_and_tokenizer(
     return model, tokenizer
 
 
-def load_mistral_7b() -> Tuple[PreTrainedModel, PreTrainedTokenizerBase]:
-    """Load the Mistral 7B instruct model, falling back to distilgpt2 on MPS."""
+def load_mistral_7b(device: str | None = None) -> Tuple[PreTrainedModel, PreTrainedTokenizerBase]:
+    """Load the Mistral 7B instruct model with the best available local device support."""
 
-    if not torch.cuda.is_available():
-        print("⚠️ CUDA not available. bitsandbytes 4-bit quantization requires NVIDIA GPUs.")
-        print("⚠️ Falling back to distilgpt2 for local macOS development.")
-        return load_model("distilgpt2", device="mps")
-
-    from bitsandbytes import BitsAndBytesConfig
     model_name = "mistralai/Mistral-7B-Instruct-v0.1"
-    quant_config = BitsAndBytesConfig(
-        load_in_4bit=True,
-        bnb_4bit_compute_dtype=torch.float16,
-        bnb_4bit_use_double_quant=True,
-        bnb_4bit_quant_type="nf4",
-    )
+    device = resolve_device(device)
 
     tokenizer = AutoTokenizer.from_pretrained(model_name)
-    model = AutoModelForCausalLM.from_pretrained(
-        model_name,
-        quantization_config=quant_config,
-        device_map="auto",
-        trust_remote_code=False,
-    )
-
     if tokenizer.pad_token is None and tokenizer.eos_token is not None:
         tokenizer.pad_token = tokenizer.eos_token
 
+    if device == "cpu":
+        raise RuntimeError(
+            "Mistral 7B on CPU is not supported. Please use MPS or CUDA, or fall back to a smaller model."
+        )
+
+    model_kwargs = {
+        "torch_dtype": torch.float16,
+        "device_map": "auto",
+    }
+
+    if device == "cuda":
+        model_kwargs["load_in_4bit"] = False
+    elif device == "mps":
+        # Use native float16 on Apple Silicon for compatibility.
+        model_kwargs["load_in_4bit"] = False
+
+    model = AutoModelForCausalLM.from_pretrained(
+        model_name,
+        trust_remote_code=False,
+        **model_kwargs,
+    )
     model.eval()
     return model, tokenizer
 

@@ -114,6 +114,38 @@ def load_model_and_tokenizer(
     return model, tokenizer
 
 
+def load_mistral_7b() -> Tuple[PreTrainedModel, PreTrainedTokenizerBase]:
+    """Load the Mistral 7B instruct model, falling back to distilgpt2 on MPS."""
+
+    if not torch.cuda.is_available():
+        print("⚠️ CUDA not available. bitsandbytes 4-bit quantization requires NVIDIA GPUs.")
+        print("⚠️ Falling back to distilgpt2 for local macOS development.")
+        return load_model("distilgpt2", device="mps")
+
+    from bitsandbytes import BitsAndBytesConfig
+    model_name = "mistralai/Mistral-7B-Instruct-v0.1"
+    quant_config = BitsAndBytesConfig(
+        load_in_4bit=True,
+        bnb_4bit_compute_dtype=torch.float16,
+        bnb_4bit_use_double_quant=True,
+        bnb_4bit_quant_type="nf4",
+    )
+
+    tokenizer = AutoTokenizer.from_pretrained(model_name)
+    model = AutoModelForCausalLM.from_pretrained(
+        model_name,
+        quantization_config=quant_config,
+        device_map="auto",
+        trust_remote_code=False,
+    )
+
+    if tokenizer.pad_token is None and tokenizer.eos_token is not None:
+        tokenizer.pad_token = tokenizer.eos_token
+
+    model.eval()
+    return model, tokenizer
+
+
 def load_model(
     model_name: str = "distilgpt2",
     *,

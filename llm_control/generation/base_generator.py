@@ -35,7 +35,6 @@ class GenerationResult:
     full_text: str = ""
     steps: list[TokenStep] = field(default_factory=list)
     regeneration_count: int = 0
-    regeneration_count: int = 0
 
     @property
     def entropy_trace(self) -> list[float]:

@@ -18,9 +18,6 @@ ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from llm_control.model.loader import load_distilgpt2, load_mistral_7b
-from llm_control.generation.base_generator import generate_stepwise
-from llm_control.generation.adaptive_generator import generate_adaptive
 from llm_control.metrics.confidence import compute_confidence
 from llm_control.logging.storage import RunStorage
 
@@ -32,41 +29,68 @@ rate_limit_window_s = 60
 rate_limit_max_requests = 6
 request_history: dict[str, deque[float]] = defaultdict(deque)
 
+
+def _is_remote_mode() -> bool:
+    return os.getenv("USE_REMOTE_MODEL", "").strip().lower() in {"true", "1", "yes"}
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    print("Loading model...")
-    model_name = os.getenv("MODEL_TYPE", os.getenv("MODEL_NAME", "small")).strip().lower()
-    selected_model = "mistral-7b"
-    selected_device = "mps"
+    if _is_remote_mode():
+        # ── Remote mode: HF Inference API ──
+        print("Initialising remote inference client (HF Inference API)...")
+        from llm_control.model.remote_client import RemoteModelClient
 
-    if model_name in {"small", "distilgpt2"}:
-        model, tokenizer = load_distilgpt2(device="cpu")
-        selected_model = "distilgpt2"
-        selected_device = "cpu"
-    else:
         try:
-            model, tokenizer = load_mistral_7b()
+            client = RemoteModelClient()
         except RuntimeError as err:
-            print(f"Mistral load failed: {err}")
-            print("Falling back to distilgpt2 on CPU for local development.")
+            print(f"Remote client init failed: {err}")
+            raise
+
+        state["remote_client"] = client
+        state["model_name"] = client.model_id
+        state["device"] = "remote-api"
+        state["mode"] = "remote"
+        print(f"Remote client ready → model={client.model_id}")
+    else:
+        # ── Local mode: load model into memory ──
+        print("Loading model...")
+        from llm_control.model.loader import load_distilgpt2, load_mistral_7b
+
+        model_name = os.getenv("MODEL_TYPE", os.getenv("MODEL_NAME", "small")).strip().lower()
+        selected_model = "mistral-7b"
+        selected_device = "mps"
+
+        if model_name in {"small", "distilgpt2"}:
             model, tokenizer = load_distilgpt2(device="cpu")
             selected_model = "distilgpt2"
             selected_device = "cpu"
+        else:
+            try:
+                model, tokenizer = load_mistral_7b()
+            except RuntimeError as err:
+                print(f"Mistral load failed: {err}")
+                print("Falling back to distilgpt2 on CPU for local development.")
+                model, tokenizer = load_distilgpt2(device="cpu")
+                selected_model = "distilgpt2"
+                selected_device = "cpu"
 
-    state["model"] = model
-    state["tokenizer"] = tokenizer
-    state["model_name"] = selected_model
-    state["device"] = selected_device
-    
-    print("Warming up model...")
-    import torch
-    try:
-        warmup_device = "mps" if selected_device == "mps" else "cpu"
-        model(torch.ones(1, 1, dtype=torch.long).to(warmup_device))
-    except Exception as e:
-        print(f"Warmup warning: {e}")
-        
-    print(f"Model loaded and warmed up successfully ({selected_model} on {selected_device}).")
+        state["model"] = model
+        state["tokenizer"] = tokenizer
+        state["model_name"] = selected_model
+        state["device"] = selected_device
+        state["mode"] = "local"
+
+        print("Warming up model...")
+        import torch
+        try:
+            warmup_device = "mps" if selected_device == "mps" else "cpu"
+            model(torch.ones(1, 1, dtype=torch.long).to(warmup_device))
+        except Exception as e:
+            print(f"Warmup warning: {e}")
+
+        print(f"Model loaded and warmed up successfully ({selected_model} on {selected_device}).")
+
     yield
     state.clear()
 
@@ -132,22 +156,18 @@ def enforce_rate_limit(request: Request) -> None:
     history.append(now)
 
 
-@app.post("/generate", response_model=GenerateResponse)
-def generate(req: GenerateRequest, request: Request):
-    enforce_rate_limit(request)
-    start_time = time.time()
+# ---------------------------------------------------------------------------
+# Generation helpers (keep endpoint clean)
+# ---------------------------------------------------------------------------
+
+def _generate_local(req: GenerateRequest):
+    """Run generation using the locally loaded model."""
+    from llm_control.generation.base_generator import generate_stepwise
+    from llm_control.generation.adaptive_generator import generate_adaptive
 
     model = state["model"]
     tokenizer = state["tokenizer"]
 
-    prompt_length = len(req.prompt.strip())
-    if prompt_length == 0:
-        raise HTTPException(status_code=400, detail="Prompt cannot be empty")
-    if prompt_length > 2000:
-        raise HTTPException(status_code=400, detail="Prompt too long (max 2000 chars)")
-    if req.max_tokens > 100:
-        raise HTTPException(status_code=400, detail="max_tokens too large (max 100)")
-    
     plain_obj = None
     adapt_obj = None
     plain_conf = None
@@ -182,6 +202,73 @@ def generate(req: GenerateRequest, request: Request):
         if "MPS out of memory" in str(e) or "out of memory" in str(e).lower():
             raise HTTPException(status_code=500, detail="Model too large for current memory")
         raise e
+
+    return plain_obj, adapt_obj, plain_conf, adapt_conf, plain_steps, adapt_steps
+
+
+def _generate_remote(req: GenerateRequest):
+    """Run generation via the HuggingFace Inference API."""
+    from llm_control.generation.remote_generator import (
+        generate_remote_plain,
+        generate_remote_adaptive,
+    )
+
+    client = state["remote_client"]
+
+    plain_obj = None
+    adapt_obj = None
+    plain_conf = None
+    adapt_conf = None
+    plain_steps = []
+    adapt_steps = []
+
+    try:
+        if req.mode in ["compare", "plain"]:
+            plain_res = generate_remote_plain(client, req.prompt, max_tokens=req.max_tokens)
+            plain_conf = compute_confidence(plain_res.steps, regeneration_count=0)
+            plain_steps = [{"token": s.token_text, "entropy": s.entropy, "instability": s.instability, "action": s.action} for s in plain_res.steps]
+            plain_obj = ModeResponse(
+                text=plain_res.generated_text,
+                steps=plain_steps,
+                confidence=plain_conf.confidence,
+                regenerations=0
+            )
+
+        if req.mode in ["compare", "adaptive"]:
+            adapt_res = generate_remote_adaptive(client, req.prompt, max_tokens=req.max_tokens)
+            adapt_conf = compute_confidence(adapt_res.steps, regeneration_count=adapt_res.regeneration_count)
+            adapt_steps = [{"token": s.token_text, "entropy": s.entropy, "instability": s.instability, "action": s.action} for s in adapt_res.steps]
+            adapt_obj = ModeResponse(
+                text=adapt_res.generated_text,
+                steps=adapt_steps,
+                confidence=adapt_conf.confidence,
+                regenerations=getattr(adapt_res, "regeneration_count", 0)
+            )
+
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"Remote inference failed: {e}")
+
+    return plain_obj, adapt_obj, plain_conf, adapt_conf, plain_steps, adapt_steps
+
+
+@app.post("/generate", response_model=GenerateResponse)
+def generate(req: GenerateRequest, request: Request):
+    enforce_rate_limit(request)
+    start_time = time.time()
+
+    prompt_length = len(req.prompt.strip())
+    if prompt_length == 0:
+        raise HTTPException(status_code=400, detail="Prompt cannot be empty")
+    if prompt_length > 2000:
+        raise HTTPException(status_code=400, detail="Prompt too long (max 2000 chars)")
+    if req.max_tokens > 100:
+        raise HTTPException(status_code=400, detail="max_tokens too large (max 100)")
+
+    # Branch: remote vs local
+    if state.get("mode") == "remote":
+        plain_obj, adapt_obj, plain_conf, adapt_conf, plain_steps, adapt_steps = _generate_remote(req)
+    else:
+        plain_obj, adapt_obj, plain_conf, adapt_conf, plain_steps, adapt_steps = _generate_local(req)
 
     latency_ms = int((time.time() - start_time) * 1000)
         
@@ -246,7 +333,8 @@ def recent_runs(limit: int = 10):
 def health_check():
     return {
         "status": "ok",
-        "model_loaded": "model" in state,
-        "model": state.get("model_name") if "model" in state else None,
-        "device": state.get("device") if "model" in state else None,
+        "mode": state.get("mode", "unknown"),
+        "model_loaded": "model" in state or "remote_client" in state,
+        "model": state.get("model_name") if ("model" in state or "remote_client" in state) else None,
+        "device": state.get("device") if ("model" in state or "remote_client" in state) else None,
     }

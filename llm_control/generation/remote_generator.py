@@ -7,7 +7,7 @@ control-decision logic locally.
 
 from __future__ import annotations
 
-from llm_control.generation.base_generator import GenerationResult, TokenStep
+from llm_control.generation.types import GenerationResult, TokenStep
 from llm_control.metrics.stability import detect_instability
 from llm_control.control.controller import decide_control
 from llm_control.model.remote_client import (

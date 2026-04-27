@@ -1,0 +1,6 @@
+# Lightweight dependencies for remote inference mode (Render free tier).
+# Excludes torch, transformers, accelerate — model runs via HF Inference API.
+fastapi>=0.110.0
+uvicorn[standard]>=0.27.0
+pydantic>=2.0.0
+huggingface_hub>=0.23.0

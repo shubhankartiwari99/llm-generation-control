@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-import torch
 
 
 @dataclass
@@ -67,7 +66,7 @@ def compute_confidence(step_trace, regeneration_count: int = 0) -> ConfidenceSum
 
 
 def max_probability_confidence(
-    probabilities: torch.Tensor, *, dim: int = -1
-) -> torch.Tensor:
+    probabilities, *, dim: int = -1
+):
     """Per-token confidence as max probability (kept for backward compat)."""
     return probabilities.max(dim=dim).values

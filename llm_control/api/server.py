@@ -246,7 +246,9 @@ def _generate_remote(req: GenerateRequest):
             )
 
     except Exception as e:
-        raise HTTPException(status_code=502, detail=f"Remote inference failed: {e}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=502, detail=f"Remote inference failed ({type(e).__name__}): {e}")
 
     return plain_obj, adapt_obj, plain_conf, adapt_conf, plain_steps, adapt_steps
 

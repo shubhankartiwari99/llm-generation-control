@@ -1,7 +1,8 @@
 """HuggingFace Inference API client for remote model inference.
 
-Wraps huggingface_hub.InferenceClient to provide token-level details
-(logprobs, top-N alternatives) needed by the entropy / stability pipeline.
+Uses the chat_completion API (the modern, well-supported path) with
+optional logprobs for entropy computation.  Falls back to heuristic
+entropy estimation when logprobs are unavailable.
 """
 
 from __future__ import annotations
@@ -15,25 +16,24 @@ from huggingface_hub import InferenceClient
 
 
 # ---------------------------------------------------------------------------
-# Data containers for the raw API response
+# Data containers
 # ---------------------------------------------------------------------------
 
 @dataclass
 class RemoteTokenInfo:
-    """Single generated token with logprob and top-N alternatives."""
+    """Single generated token with probability information."""
 
     text: str
     logprob: float
     token_id: int
-    top_tokens: List[TopTokenInfo] = field(default_factory=list)
+    top_logprobs: List[TopLogprob] = field(default_factory=list)
 
 
 @dataclass
-class TopTokenInfo:
+class TopLogprob:
     """One candidate from the top-N distribution at a generation step."""
 
-    text: str
-    token_id: int
+    token: str
     logprob: float
 
 
@@ -50,28 +50,32 @@ class RemoteGenerationOutput:
 # Client
 # ---------------------------------------------------------------------------
 
-DEFAULT_MODEL = "mistralai/Mistral-7B-Instruct-v0.1"
-TOP_N_TOKENS = 20  # enough to approximate entropy
+DEFAULT_MODEL = "Qwen/Qwen2.5-7B-Instruct"
+DEFAULT_PROVIDER = "together"
 
 
 class RemoteModelClient:
-    """Thin wrapper around HF InferenceClient with entropy-friendly defaults."""
+    """Wrapper around HF InferenceClient using chat_completion API."""
 
     def __init__(
         self,
         model_id: Optional[str] = None,
         token: Optional[str] = None,
+        provider: Optional[str] = None,
     ) -> None:
         self.model_id = model_id or os.getenv("HF_MODEL_ID", DEFAULT_MODEL)
+        self.provider = provider or os.getenv("HF_PROVIDER", DEFAULT_PROVIDER)
         self.token = token or os.getenv("HF_TOKEN")
         if not self.token:
             raise RuntimeError(
                 "HF_TOKEN environment variable is required for remote inference. "
                 "Get a free token at https://huggingface.co/settings/tokens"
             )
-        self.client = InferenceClient(model=self.model_id, token=self.token)
-
-    # ----- public API -----
+        self.client = InferenceClient(
+            model=self.model_id,
+            provider=self.provider,
+            token=self.token,
+        )
 
     def generate(
         self,
@@ -79,85 +83,95 @@ class RemoteModelClient:
         *,
         max_new_tokens: int = 40,
         temperature: float = 1.0,
-        top_p: float = 1.0,
         repetition_penalty: float = 1.0,
     ) -> RemoteGenerationOutput:
-        """Call HF Inference API and return token-level details."""
+        """Call HF chat_completion API and return token-level details."""
 
-        response = self.client.text_generation(
-            prompt,
-            max_new_tokens=max_new_tokens,
-            temperature=max(temperature, 0.01),  # API rejects exactly 0
-            top_p=top_p,
-            repetition_penalty=repetition_penalty,
-            details=True,
-            top_n_tokens=TOP_N_TOKENS,
-            return_full_text=False,
+        response = self.client.chat_completion(
+            messages=[{"role": "user", "content": prompt}],
+            max_tokens=max_new_tokens,
+            temperature=max(temperature, 0.01),
+            logprobs=True,
+            top_logprobs=5,
         )
 
-        # Parse the response into our dataclasses
-        tokens: list[RemoteTokenInfo] = []
-        if hasattr(response, "details") and response.details:
-            for tok in response.details.tokens:
-                top_list: list[TopTokenInfo] = []
-                if tok.top_tokens:
-                    for alt in tok.top_tokens:
-                        top_list.append(
-                            TopTokenInfo(
-                                text=alt.text if hasattr(alt, "text") else str(alt.get("text", "")),
-                                token_id=alt.id if hasattr(alt, "id") else int(alt.get("id", 0)),
-                                logprob=alt.logprob if hasattr(alt, "logprob") else float(alt.get("logprob", 0.0)),
-                            )
-                        )
-                tokens.append(
-                    RemoteTokenInfo(
-                        text=tok.text if hasattr(tok, "text") else str(tok),
-                        logprob=tok.logprob if hasattr(tok, "logprob") else 0.0,
-                        token_id=tok.id if hasattr(tok, "id") else 0,
-                        top_tokens=top_list,
-                    )
-                )
+        choice = response.choices[0]
+        generated_text = choice.message.content or ""
+        finish_reason = str(choice.finish_reason) if choice.finish_reason else None
 
-        generated_text = response.generated_text if hasattr(response, "generated_text") else str(response)
-        finish_reason = None
-        if hasattr(response, "details") and response.details:
-            finish_reason = getattr(response.details, "finish_reason", None)
+        # Parse token-level logprobs if available
+        tokens: list[RemoteTokenInfo] = []
+
+        if choice.logprobs and choice.logprobs.content:
+            for lp_item in choice.logprobs.content:
+                top_list: list[TopLogprob] = []
+                if lp_item.top_logprobs:
+                    for alt in lp_item.top_logprobs:
+                        top_list.append(TopLogprob(
+                            token=alt.token,
+                            logprob=alt.logprob,
+                        ))
+
+                tokens.append(RemoteTokenInfo(
+                    text=lp_item.token,
+                    logprob=lp_item.logprob,
+                    token_id=hash(lp_item.token) & 0xFFFFFFFF,  # synthetic ID
+                    top_logprobs=top_list,
+                ))
+        else:
+            # No logprobs available — synthesize tokens from the text
+            # Split by whitespace as a rough tokenization
+            words = generated_text.split()
+            for i, word in enumerate(words):
+                token_text = word if i == 0 else " " + word
+                tokens.append(RemoteTokenInfo(
+                    text=token_text,
+                    logprob=-1.0,  # unknown
+                    token_id=hash(token_text) & 0xFFFFFFFF,
+                    top_logprobs=[],
+                ))
 
         return RemoteGenerationOutput(
             generated_text=generated_text,
             tokens=tokens,
-            finish_reason=str(finish_reason) if finish_reason else None,
+            finish_reason=finish_reason,
         )
 
 
 # ---------------------------------------------------------------------------
-# Entropy helpers for logprob distributions
+# Entropy helpers
 # ---------------------------------------------------------------------------
 
-def entropy_from_top_logprobs(top_tokens: List[TopTokenInfo]) -> float:
+def entropy_from_top_logprobs(top_logprobs: List[TopLogprob]) -> float:
     """Approximate Shannon entropy from top-N token log-probabilities.
 
-    We convert logprobs → probs, normalise over the observed set, then
-    compute -Σ p·log(p).  This is an approximation because we only see
-    top-N of the full vocabulary, but with N=20 it captures the
-    high-probability mass that dominates the entropy value.
+    Converts logprobs to probs, normalises over the observed set, then
+    computes -sum(p * log(p)).
     """
 
-    if not top_tokens:
+    if not top_logprobs:
         return 0.0
 
-    # logprobs → probabilities
-    probs = [math.exp(t.logprob) for t in top_tokens]
+    probs = [math.exp(t.logprob) for t in top_logprobs]
     total = sum(probs)
     if total <= 0:
         return 0.0
 
-    # normalise so they sum to 1 over the observed set
     probs = [p / total for p in probs]
-
     entropy = 0.0
     for p in probs:
         if p > 0:
             entropy -= p * math.log(p)
 
     return entropy
+
+
+def entropy_from_single_logprob(logprob: float) -> float:
+    """Estimate entropy when only the chosen token's logprob is known.
+
+    Uses the heuristic: high probability (logprob near 0) = low entropy,
+    low probability (large negative logprob) = high entropy.
+    Maps -logprob linearly into a reasonable entropy range [0, ~4].
+    """
+
+    return min(abs(logprob) * 0.8, 6.0)

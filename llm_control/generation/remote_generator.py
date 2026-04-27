@@ -7,6 +7,8 @@ control-decision logic locally.
 
 from __future__ import annotations
 
+import math
+
 from llm_control.generation.types import GenerationResult, TokenStep
 from llm_control.metrics.stability import detect_instability
 from llm_control.control.controller import decide_control
@@ -14,6 +16,7 @@ from llm_control.model.remote_client import (
     RemoteModelClient,
     RemoteGenerationOutput,
     entropy_from_top_logprobs,
+    entropy_from_single_logprob,
 )
 
 
@@ -35,8 +38,13 @@ def _api_output_to_result(
     token_id_history: list[int] = []
 
     for idx, tok in enumerate(output.tokens):
-        entropy = entropy_from_top_logprobs(tok.top_tokens)
-        token_prob = min(1.0, max(0.0, __import__("math").exp(tok.logprob))) if tok.logprob else 0.0
+        # Compute entropy: prefer top_logprobs, fallback to single logprob heuristic
+        if tok.top_logprobs:
+            entropy = entropy_from_top_logprobs(tok.top_logprobs)
+        else:
+            entropy = entropy_from_single_logprob(tok.logprob)
+
+        token_prob = min(1.0, max(0.0, math.exp(tok.logprob))) if tok.logprob != 0 else 0.5
 
         entropy_history.append(entropy)
         token_id_history.append(tok.token_id)
@@ -96,8 +104,7 @@ def generate_remote_adaptive(
       1. Generate with default temperature.
       2. Run stability analysis on the returned tokens.
       3. If instability is detected (repetition / collapse / lock),
-         regenerate with lower temperature (0.7) — exactly like the
-         local controller does.
+         regenerate with lower temperature (0.7).
     """
 
     # --- first pass (temperature 1.0) ---
@@ -113,12 +120,10 @@ def generate_remote_adaptive(
             )
             if decision.action in ("regenerate", "lower_temperature", "stop"):
                 has_instability = True
-                # Tag the step with the control action for the UI
                 step.action = decision.action
             break  # react on first instability (mirrors local behaviour)
 
     if not has_instability:
-        # First pass was stable — return as-is with action annotations
         return result_1
 
     # --- second pass (temperature 0.7 — same as local regeneration) ---
@@ -130,9 +135,8 @@ def generate_remote_adaptive(
     )
     result_2 = _api_output_to_result(prompt, output_2, regeneration_count=1)
 
-    # Merge step traces: keep the first-pass steps as "pre-regen" context,
-    # then append second-pass steps.  This mirrors how the local adaptive
-    # generator records all steps including pre-regeneration ones.
+    # Merge step traces: keep first-pass steps as pre-regen context,
+    # then append second-pass steps.
     combined_steps = list(result_1.steps) + list(result_2.steps)
 
     return GenerationResult(

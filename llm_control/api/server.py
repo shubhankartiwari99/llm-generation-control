@@ -125,6 +125,7 @@ class ModeResponse(BaseModel):
     steps: list[TokenStepResponse]
     confidence: float
     regenerations: int = 0
+    trace_available: bool = True
 
 class GenerateResponse(BaseModel):
     plain: Optional[ModeResponse] = None
@@ -184,7 +185,8 @@ def _generate_local(req: GenerateRequest):
                 text=plain_res.generated_text,
                 steps=plain_steps,
                 confidence=plain_conf.confidence,
-                regenerations=0
+                regenerations=0,
+                trace_available=len(plain_steps) > 0,
             )
 
         if req.mode in ["compare", "adaptive"]:
@@ -195,7 +197,8 @@ def _generate_local(req: GenerateRequest):
                 text=adapt_res.generated_text,
                 steps=adapt_steps,
                 confidence=adapt_conf.confidence,
-                regenerations=getattr(adapt_res, "regeneration_count", 0)
+                regenerations=getattr(adapt_res, "regeneration_count", 0),
+                trace_available=len(adapt_steps) > 0,
             )
 
     except RuntimeError as e:
@@ -231,7 +234,8 @@ def _generate_remote(req: GenerateRequest):
                 text=plain_res.generated_text,
                 steps=plain_steps,
                 confidence=plain_conf.confidence,
-                regenerations=0
+                regenerations=0,
+                trace_available=len(plain_steps) > 0,
             )
 
         if req.mode in ["compare", "adaptive"]:
@@ -242,7 +246,8 @@ def _generate_remote(req: GenerateRequest):
                 text=adapt_res.generated_text,
                 steps=adapt_steps,
                 confidence=adapt_conf.confidence,
-                regenerations=getattr(adapt_res, "regeneration_count", 0)
+                regenerations=getattr(adapt_res, "regeneration_count", 0),
+                trace_available=len(adapt_steps) > 0,
             )
 
     except Exception as e:
@@ -277,14 +282,26 @@ def generate(req: GenerateRequest, request: Request):
     def compute_mode_summary(steps: list[dict], confidence: float | None, regenerations: int = 0) -> dict:
         if confidence is None:
             return {}
-        entropies = [s["entropy"] for s in steps] if steps else []
+        if not steps:
+            return {
+                "confidence": 0.0,
+                "instabilities": 0,
+                "regenerations": regenerations,
+                "avg_entropy": None,
+                "max_entropy": None,
+                "min_entropy": None,
+                "trace_available": False,
+                "note": "trace_unavailable",
+            }
+        entropies = [s["entropy"] for s in steps]
         return {
             "confidence": confidence,
             "instabilities": sum(1 for s in steps if s["instability"]),
             "regenerations": regenerations,
-            "avg_entropy": (sum(entropies) / len(entropies)) if entropies else 0.0,
-            "max_entropy": max(entropies) if entropies else 0.0,
-            "min_entropy": min(entropies) if entropies else 0.0,
+            "avg_entropy": sum(entropies) / len(entropies),
+            "max_entropy": max(entropies),
+            "min_entropy": min(entropies),
+            "trace_available": True,
         }
 
     summary = {

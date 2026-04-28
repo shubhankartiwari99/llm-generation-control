@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import math
 import os
+import re
 from dataclasses import dataclass, field
 from typing import List, Optional
 
@@ -119,14 +120,21 @@ class RemoteModelClient:
                     top_logprobs=top_list,
                 ))
         else:
-            # No logprobs available — synthesize tokens from the text
-            # Split by whitespace as a rough tokenization
-            words = generated_text.split()
-            for i, word in enumerate(words):
-                token_text = word if i == 0 else " " + word
+            # No logprobs available — synthesize a trace from the text
+            token_strings = re.findall(r'\s+|\w+|[^\s\w]', generated_text)
+            
+            for i, token_text in enumerate(token_strings):
+                # Detect repetition (checking i-2 because words and spaces interleave)
+                is_repeat = i >= 2 and token_text.strip() and token_text == token_strings[i-2]
+                
+                # Synthetic proxy logprob: 
+                # - If repeating: logprob near 0 (yielding low entropy)
+                # - If normal: moderate logprob (yielding moderate entropy ~1.6)
+                synthetic_logprob = -0.1 if is_repeat else -2.0
+                
                 tokens.append(RemoteTokenInfo(
                     text=token_text,
-                    logprob=-1.0,  # unknown
+                    logprob=synthetic_logprob,
                     token_id=hash(token_text) & 0xFFFFFFFF,
                     top_logprobs=[],
                 ))

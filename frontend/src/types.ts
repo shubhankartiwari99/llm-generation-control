@@ -10,15 +10,18 @@ export interface ModeResponse {
   steps: TokenStep[];
   confidence: number;
   regenerations: number;
+  trace_available: boolean;
 }
 
 export interface ModeSummary {
   confidence: number;
   instabilities: number;
   regenerations: number;
-  avg_entropy: number;
-  max_entropy: number;
-  min_entropy: number;
+  avg_entropy: number | null;
+  max_entropy: number | null;
+  min_entropy: number | null;
+  trace_available?: boolean;
+  note?: string;
 }
 
 export interface CompareSummary {

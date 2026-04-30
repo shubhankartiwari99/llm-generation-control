@@ -22,6 +22,7 @@ class TokenStep:
     entropy: float
     instability: Optional[str] = None
     action: Optional[str] = "continue"
+    temperature: float = 1.0
 
 
 @dataclass

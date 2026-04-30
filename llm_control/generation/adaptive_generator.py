@@ -4,9 +4,9 @@ from __future__ import annotations
 
 import torch
 import torch.nn.functional as F
-from transformers import PreTrainedModel, PreTrainedTokenizerBase
+from transformers import PreTrainedModel, PreTrainedTokenizerBase, RepetitionPenaltyLogitsProcessor, TopPLogitsWarper
 
-from llm_control.control.controller import decide_control
+from llm_control.control.controller import decide_action
 from llm_control.generation.base_generator import GenerationResult, TokenStep
 from llm_control.metrics.entropy import compute_entropy
 from llm_control.metrics.stability import detect_instability
@@ -41,7 +41,20 @@ def generate_adaptive(
     with torch.no_grad():
         while total_steps < max_tokens:
             outputs = model(input_ids=generated)
-            logits = outputs.logits[:, -1, :] / max(temperature, 1e-8)
+            logits = outputs.logits[:, -1, :]
+
+            # Apply repetition penalty
+            rep_processor = RepetitionPenaltyLogitsProcessor(penalty=1.2)
+            logits = rep_processor(generated, logits)
+
+            # Apply temperature
+            logits = logits / max(temperature, 1e-8)
+
+            # Apply top_p if regenerating or high uncertainty
+            current_top_p = top_p if 'top_p' in locals() else (0.9 if regen_count > 0 else 1.0)
+            if current_top_p < 1.0:
+                top_p_warper = TopPLogitsWarper(top_p=current_top_p)
+                logits = top_p_warper(generated, logits)
 
             probs = F.softmax(logits, dim=-1)
             entropy = float(compute_entropy(logits, dim=-1).item())
@@ -51,11 +64,11 @@ def generate_adaptive(
             entropy_history.append(entropy)
             token_history.append(token_id)
 
-            instability = detect_instability(entropy_history, token_history)
-            decision = decide_control(instability, local_step, entropy, temperature)
+            instability = detect_instability(entropy, token_history)
+            action = decide_action(instability, local_step, regen_count > 0)
 
             token_text = tokenizer.decode(
-                [token_id], clean_up_tokenization_spaces=False
+                [token_id], skip_special_tokens=True, clean_up_tokenization_spaces=False
             )
 
             step = TokenStep(
@@ -65,7 +78,8 @@ def generate_adaptive(
                 token_probability=float(probs[0, token_id].item()),
                 entropy=entropy,
                 instability=instability,
-                action=decision.action,
+                action=action,
+                temperature=temperature,
             )
             all_steps.append(step)
 
@@ -73,8 +87,8 @@ def generate_adaptive(
                 token_display = token_text.encode("unicode_escape").decode("ascii")
                 flag = f" | Instability: {instability}" if instability else ""
                 action_info = (
-                    f" | Action: {decision.action}"
-                    if decision.action != "continue"
+                    f" | Action: {action}"
+                    if action != "continue"
                     else ""
                 )
                 print(
@@ -85,11 +99,14 @@ def generate_adaptive(
 
             total_steps += 1
 
-            if decision.action == "lower_temperature":
-                if decision.new_temperature is not None:
-                    temperature = decision.new_temperature
+            if action == "lower_temperature":
+                temperature = max(0.4, temperature - 0.2)
+                if instability == "high_uncertainty":
+                    top_p = 0.85
+                elif regen_count == 0:
+                    top_p = 1.0
 
-            elif decision.action == "regenerate":
+            elif action == "regenerate":
                 if regen_count < max_regens:
                     if verbose:
                         print("Regenerating from prompt...")
@@ -98,11 +115,12 @@ def generate_adaptive(
                     token_history = []
                     final_token_ids = []
                     temperature = 0.7
+                    top_p = 0.9
                     regen_count += 1
                     local_step = 0
                     continue
 
-            elif decision.action == "stop":
+            elif action == "stop":
                 if verbose:
                     print("Stopping generation")
                 break

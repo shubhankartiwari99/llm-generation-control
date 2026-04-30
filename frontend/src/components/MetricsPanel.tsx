@@ -1,15 +1,15 @@
 "use client";
 
 interface MetricsPanelProps {
-  confidence: number | null;
+  reliability_score: number | null;
   instabilityCount: number;
   regenerations: number;
   avgEntropy: number | null;
   latencyMs?: number;
 }
 
-export default function MetricsPanel({ confidence, instabilityCount, regenerations, avgEntropy, latencyMs }: MetricsPanelProps) {
-  const getConfidenceColor = (conf: number | null) => {
+export default function MetricsPanel({ reliability_score, instabilityCount, regenerations, avgEntropy, latencyMs }: MetricsPanelProps) {
+  const getReliabilityColor = (conf: number | null) => {
     if (conf === null) return "text-secondary";
     if (conf >= 0.7) return "text-success";
     if (conf >= 0.4) return "text-warning";
@@ -22,9 +22,9 @@ export default function MetricsPanel({ confidence, instabilityCount, regeneratio
       
       <div className="metrics-grid">
         <div className="metric-card">
-          <div className="metric-label">Confidence</div>
-          <div className={`metric-value ${getConfidenceColor(confidence)}`}>
-            {confidence !== null ? (confidence * 100).toFixed(1) + "%" : "-"}
+          <div className="metric-label">Reliability</div>
+          <div className={`metric-value ${getReliabilityColor(reliability_score)}`}>
+            {reliability_score !== null ? (reliability_score * 100).toFixed(1) + "%" : "-"}
           </div>
         </div>
 

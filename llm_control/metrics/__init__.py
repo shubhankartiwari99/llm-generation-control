@@ -4,7 +4,7 @@ Heavy (torch-dependent) metrics are lazy-loaded so that
 importing confidence or stability alone does not pull in torch.
 """
 
-from llm_control.metrics.confidence import ConfidenceSummary, compute_confidence, max_probability_confidence
+from llm_control.metrics.confidence import ReliabilitySummary, compute_reliability_score, max_probability_confidence
 
 
 def __getattr__(name: str):

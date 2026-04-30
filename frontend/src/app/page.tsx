@@ -142,15 +142,15 @@ export default function Home() {
             <div>
               <h3 style={{ marginBottom: "1rem" }}>Performance Metrics</h3>
               <MetricsPanel 
-                confidence={data.adaptive?.confidence ?? null}
+                reliability_score={data.adaptive?.reliability_score ?? null}
                 instabilityCount={getInstabilityCount(data.adaptive?.steps)}
                 regenerations={data.adaptive?.regenerations || 0}
                 avgEntropy={getAvgEntropy(data.adaptive?.steps)}
                 latencyMs={data.latency_ms}
               />
-              {data.summary?.compare?.delta_confidence !== undefined && (
+              {data.summary?.compare?.delta_reliability_score !== undefined && (
                 <div className="glass-panel" style={{ marginTop: "1rem", padding: "0.75rem", fontSize: "0.9rem" }}>
-                  Δ confidence: {(data.summary.compare.delta_confidence * 100).toFixed(1)} pts | Instabilities reduced: {data.summary.compare.instabilities_reduced_by ?? 0}
+                  Δ reliability_score: {(data.summary.compare.delta_reliability_score * 100).toFixed(1)} pts | Instabilities reduced: {data.summary.compare.instabilities_reduced_by ?? 0}
                 </div>
               )}
               <div style={{ marginTop: "1rem", fontSize: "0.85rem" }} className="text-secondary">

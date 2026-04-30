@@ -18,7 +18,7 @@ ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from llm_control.metrics.confidence import compute_confidence
+from llm_control.metrics.confidence import compute_reliability_score
 from llm_control.logging.storage import RunStorage
 
 
@@ -115,17 +115,25 @@ class GenerateRequest(BaseModel):
 
 class TokenStepResponse(BaseModel):
     token: str
-    entropy: float
+    entropy: Optional[float]
     instability: Optional[str] = None
     action: Optional[str] = "continue"
+    temperature: float = 1.0
 
 
 class ModeResponse(BaseModel):
     text: str
     steps: list[TokenStepResponse]
-    confidence: float
+    reliability_score: Optional[float]
+    reliability_type: str
+    confidence_breakdown: Optional[dict[str, float]] = None
     regenerations: int = 0
+    steps_available: bool = True
     trace_available: bool = True
+
+class Capabilities(BaseModel):
+    entropy_available: bool
+    control_enabled: bool
 
 class GenerateResponse(BaseModel):
     plain: Optional[ModeResponse] = None
@@ -134,6 +142,7 @@ class GenerateResponse(BaseModel):
     latency_ms: int
     model: str = "mistral-7b"
     device: str = "mps"
+    capabilities: Capabilities
 
 
 class RecentRunsResponse(BaseModel):
@@ -179,26 +188,32 @@ def _generate_local(req: GenerateRequest):
     try:
         if req.mode in ["compare", "plain"]:
             plain_res = generate_stepwise(model, tokenizer, req.prompt, max_tokens=req.max_tokens, stop_at_eos=True)
-            plain_conf = compute_confidence(plain_res.steps, regeneration_count=0)
-            plain_steps = [{"token": s.token_text, "entropy": s.entropy, "instability": s.instability, "action": s.action} for s in plain_res.steps]
+            plain_conf = compute_reliability_score(plain_res.steps, regeneration_count=0)
+            plain_steps = [{"token": s.token_text, "entropy": s.entropy, "instability": s.instability, "action": s.action, "temperature": getattr(s, "temperature", 1.0)} for s in plain_res.steps]
             plain_obj = ModeResponse(
                 text=plain_res.generated_text,
                 steps=plain_steps,
-                confidence=plain_conf.confidence,
+                reliability_score=plain_conf.reliability_score if plain_conf else None,
+                reliability_type="entropy_based" if plain_conf else "unavailable",
+                confidence_breakdown=plain_conf.confidence_breakdown if plain_conf else None,
                 regenerations=0,
-                trace_available=len(plain_steps) > 0,
+                steps_available=True,
+                trace_available=True,
             )
 
         if req.mode in ["compare", "adaptive"]:
             adapt_res = generate_adaptive(model, tokenizer, req.prompt, max_tokens=req.max_tokens, verbose=False)
-            adapt_conf = compute_confidence(adapt_res.steps, regeneration_count=adapt_res.regeneration_count)
-            adapt_steps = [{"token": s.token_text, "entropy": s.entropy, "instability": s.instability, "action": s.action} for s in adapt_res.steps]
+            adapt_conf = compute_reliability_score(adapt_res.steps, regeneration_count=adapt_res.regeneration_count)
+            adapt_steps = [{"token": s.token_text, "entropy": s.entropy, "instability": s.instability, "action": s.action, "temperature": getattr(s, "temperature", 1.0)} for s in adapt_res.steps]
             adapt_obj = ModeResponse(
                 text=adapt_res.generated_text,
                 steps=adapt_steps,
-                confidence=adapt_conf.confidence,
+                reliability_score=adapt_conf.reliability_score if adapt_conf else None,
+                reliability_type="entropy_based" if adapt_conf else "unavailable",
+                confidence_breakdown=adapt_conf.confidence_breakdown if adapt_conf else None,
                 regenerations=getattr(adapt_res, "regeneration_count", 0),
-                trace_available=len(adapt_steps) > 0,
+                steps_available=True,
+                trace_available=True,
             )
 
     except RuntimeError as e:
@@ -228,26 +243,15 @@ def _generate_remote(req: GenerateRequest):
     try:
         if req.mode in ["compare", "plain"]:
             plain_res = generate_remote_plain(client, req.prompt, max_tokens=req.max_tokens)
-            plain_conf = compute_confidence(plain_res.steps, regeneration_count=0)
-            plain_steps = [{"token": s.token_text, "entropy": s.entropy, "instability": s.instability, "action": s.action} for s in plain_res.steps]
             plain_obj = ModeResponse(
                 text=plain_res.generated_text,
-                steps=plain_steps,
-                confidence=plain_conf.confidence,
+                steps=[],
+                reliability_score=None,
+                reliability_type="unavailable",
+                confidence_breakdown=None,
                 regenerations=0,
-                trace_available=len(plain_steps) > 0,
-            )
-
-        if req.mode in ["compare", "adaptive"]:
-            adapt_res = generate_remote_adaptive(client, req.prompt, max_tokens=req.max_tokens)
-            adapt_conf = compute_confidence(adapt_res.steps, regeneration_count=adapt_res.regeneration_count)
-            adapt_steps = [{"token": s.token_text, "entropy": s.entropy, "instability": s.instability, "action": s.action} for s in adapt_res.steps]
-            adapt_obj = ModeResponse(
-                text=adapt_res.generated_text,
-                steps=adapt_steps,
-                confidence=adapt_conf.confidence,
-                regenerations=getattr(adapt_res, "regeneration_count", 0),
-                trace_available=len(adapt_steps) > 0,
+                steps_available=False,
+                trace_available=False,
             )
 
     except Exception as e:
@@ -271,6 +275,22 @@ def generate(req: GenerateRequest, request: Request):
     if req.max_tokens > 100:
         raise HTTPException(status_code=400, detail="max_tokens too large (max 100)")
 
+    device = state.get("device", "mps")
+    capabilities = {
+        "entropy_available": False,
+        "control_enabled": False
+    }
+
+    if device in ["mps", "cuda", "cpu"]:
+        capabilities["entropy_available"] = True
+        capabilities["control_enabled"] = True
+
+    if not capabilities["control_enabled"] and req.mode in ["adaptive", "compare"]:
+        raise HTTPException(
+            status_code=400,
+            detail="Adaptive control requires local model with logits access"
+        )
+
     # Branch: remote vs local
     if state.get("mode") == "remote":
         plain_obj, adapt_obj, plain_conf, adapt_conf, plain_steps, adapt_steps = _generate_remote(req)
@@ -279,14 +299,15 @@ def generate(req: GenerateRequest, request: Request):
 
     latency_ms = int((time.time() - start_time) * 1000)
         
-    def compute_mode_summary(steps: list[dict], confidence: float | None, regenerations: int = 0) -> dict:
-        if confidence is None:
+    def compute_mode_summary(steps: list[dict], conf_summary) -> dict:
+        if conf_summary is None:
             return {}
         if not steps:
             return {
-                "confidence": 0.0,
+                "reliability_score": 0.0,
+                "confidence_breakdown": None,
                 "instabilities": 0,
-                "regenerations": regenerations,
+                "regenerations": conf_summary.regeneration_count,
                 "avg_entropy": None,
                 "max_entropy": None,
                 "min_entropy": None,
@@ -295,9 +316,10 @@ def generate(req: GenerateRequest, request: Request):
             }
         entropies = [s["entropy"] for s in steps]
         return {
-            "confidence": confidence,
+            "reliability_score": conf_summary.reliability_score,
+            "confidence_breakdown": conf_summary.confidence_breakdown,
             "instabilities": sum(1 for s in steps if s["instability"]),
-            "regenerations": regenerations,
+            "regenerations": conf_summary.regeneration_count,
             "avg_entropy": sum(entropies) / len(entropies),
             "max_entropy": max(entropies),
             "min_entropy": min(entropies),
@@ -305,17 +327,13 @@ def generate(req: GenerateRequest, request: Request):
         }
 
     summary = {
-        "plain": compute_mode_summary(plain_steps, plain_conf.confidence if plain_conf else None, 0),
-        "adaptive": compute_mode_summary(
-            adapt_steps,
-            adapt_conf.confidence if adapt_conf else None,
-            adapt_obj.regenerations if adapt_obj else 0,
-        ),
+        "plain": compute_mode_summary(plain_steps, plain_conf),
+        "adaptive": compute_mode_summary(adapt_steps, adapt_conf),
         "compare": {},
     }
     if plain_conf and adapt_conf:
         summary["compare"] = {
-            "delta_confidence": adapt_conf.confidence - plain_conf.confidence,
+            "delta_reliability": adapt_conf.reliability_score - plain_conf.reliability_score,
             "instabilities_reduced_by": summary["plain"].get("instabilities", 0) - summary["adaptive"].get("instabilities", 0),
             "regeneration_gain": summary["adaptive"].get("regenerations", 0) - summary["plain"].get("regenerations", 0),
         }
@@ -326,7 +344,8 @@ def generate(req: GenerateRequest, request: Request):
         "latency_ms": latency_ms,
         "model": state.get("model_name", "mistral-7b"),
         "device": state.get("device", "mps"),
-        "summary": summary
+        "summary": summary,
+        "capabilities": capabilities
     }
 
     storage.log_run(prompt=req.prompt, mode=req.mode, response_data=response_data)
@@ -338,6 +357,7 @@ def generate(req: GenerateRequest, request: Request):
         latency_ms=latency_ms,
         model=state.get("model_name", "mistral-7b"),
         device=state.get("device", "mps"),
+        capabilities=Capabilities(**capabilities)
     )
 
 

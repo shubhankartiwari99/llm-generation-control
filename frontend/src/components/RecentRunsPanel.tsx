@@ -29,13 +29,13 @@ export default function RecentRunsPanel({ runs, isLoading = false }: RecentRunsP
               <tr className="table-head-row">
                 <th style={{ padding: "0.6rem 0.5rem" }}>Prompt</th>
                 <th style={{ padding: "0.6rem 0.5rem" }}>Mode</th>
-                <th style={{ padding: "0.6rem 0.5rem" }}>Δ Confidence</th>
+                <th style={{ padding: "0.6rem 0.5rem" }}>Δ Reliability</th>
                 <th style={{ padding: "0.6rem 0.5rem" }}>Instability Reduction</th>
               </tr>
             </thead>
             <tbody>
               {runs.map((run) => {
-                const delta = run.summary_metrics?.compare?.delta_confidence;
+                const delta = run.summary_metrics?.compare?.delta_reliability_score;
                 const reduced = run.summary_metrics?.compare?.instabilities_reduced_by;
                 return (
                   <tr key={run.trace_id} style={{ borderBottom: "1px solid rgba(255,255,255,0.05)" }}>

@@ -11,7 +11,7 @@ import math
 
 from llm_control.generation.types import GenerationResult, TokenStep
 from llm_control.metrics.stability import detect_instability
-from llm_control.control.controller import decide_control
+from llm_control.control.controller import decide_action
 from llm_control.model.remote_client import (
     RemoteModelClient,
     RemoteGenerationOutput,
@@ -49,7 +49,7 @@ def _api_output_to_result(
         entropy_history.append(entropy)
         token_id_history.append(tok.token_id)
 
-        instability = detect_instability(entropy_history, token_id_history)
+        instability = detect_instability(entropy, token_id_history)
 
         steps.append(
             TokenStep(
@@ -115,12 +115,10 @@ def generate_remote_adaptive(
     has_instability = False
     for step in result_1.steps:
         if step.instability is not None:
-            decision = decide_control(
-                step.instability, step.index, step.entropy, 1.0,
-            )
-            if decision.action in ("regenerate", "lower_temperature", "stop"):
+            decision = decide_action(step.instability, step.index, False)
+            if decision in ("regenerate", "lower_temperature", "stop"):
                 has_instability = True
-                step.action = decision.action
+                step.action = decision
             break  # react on first instability (mirrors local behaviour)
 
     if not has_instability:

@@ -85,7 +85,7 @@ class BaseGenerator:
                 # ── stability tracking ──
                 entropy_history.append(entropy)
                 token_id_history.append(token_id)
-                instability = detect_instability(entropy_history, token_id_history)
+                instability = detect_instability(entropy, token_id_history)
 
                 steps.append(
                     TokenStep(

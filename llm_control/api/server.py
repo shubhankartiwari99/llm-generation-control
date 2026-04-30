@@ -128,6 +128,7 @@ class ModeResponse(BaseModel):
     reliability_type: str
     confidence_breakdown: Optional[dict[str, float]] = None
     regenerations: int = 0
+    control_metrics: Optional[dict[str, int]] = None
     steps_available: bool = True
     trace_available: bool = True
 
@@ -197,6 +198,11 @@ def _generate_local(req: GenerateRequest):
                 reliability_type="entropy_based" if plain_conf else "unavailable",
                 confidence_breakdown=plain_conf.confidence_breakdown if plain_conf else None,
                 regenerations=0,
+                control_metrics={
+                    "tokens_generated": len(plain_steps),
+                    "interventions": 0,
+                    "temperature_adjustments": 0
+                },
                 steps_available=True,
                 trace_available=True,
             )
@@ -212,6 +218,11 @@ def _generate_local(req: GenerateRequest):
                 reliability_type="entropy_based" if adapt_conf else "unavailable",
                 confidence_breakdown=adapt_conf.confidence_breakdown if adapt_conf else None,
                 regenerations=getattr(adapt_res, "regeneration_count", 0),
+                control_metrics={
+                    "tokens_generated": len(adapt_steps),
+                    "interventions": sum(1 for s in adapt_steps if s.get("action") in ["regenerate", "lower_temperature"]),
+                    "temperature_adjustments": sum(1 for s in adapt_steps if s.get("action") == "lower_temperature")
+                },
                 steps_available=True,
                 trace_available=True,
             )
@@ -250,6 +261,7 @@ def _generate_remote(req: GenerateRequest):
                 reliability_type="unavailable",
                 confidence_breakdown=None,
                 regenerations=0,
+                control_metrics=None,
                 steps_available=False,
                 trace_available=False,
             )

@@ -13,6 +13,11 @@ export interface ModeResponse {
   reliability_type: string;
   confidence_breakdown?: Record<string, number>;
   regenerations: number;
+  control_metrics?: {
+    tokens_generated: number;
+    interventions: number;
+    temperature_adjustments: number;
+  };
   steps_available: boolean;
   trace_available: boolean;
 }

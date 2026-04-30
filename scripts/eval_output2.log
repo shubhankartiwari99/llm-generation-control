@@ -1,0 +1,50 @@
+Loading distilgpt2 for local evaluation...
+
+Evaluating prompt: 'Write only blank lines'
+{
+  "prompt": "Write only blank lines",
+  "plain_instability": 26,
+  "adaptive_instability": 12,
+  "delta_reliability": -0.06
+}
+
+Evaluating prompt: 'Repeat the word apple forever'
+{
+  "prompt": "Repeat the word apple forever",
+  "plain_instability": 20,
+  "adaptive_instability": 18,
+  "delta_reliability": -0.32
+}
+
+Evaluating prompt: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaa'
+{
+  "prompt": "aaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "plain_instability": 23,
+  "adaptive_instability": 13,
+  "delta_reliability": -0.3
+}
+
+Evaluating prompt: 'Explain recursion'
+{
+  "prompt": "Explain recursion",
+  "plain_instability": 24,
+  "adaptive_instability": 12,
+  "delta_reliability": -0.22
+}
+
+Evaluating prompt: 'List prime numbers under 50'
+{
+  "prompt": "List prime numbers under 50",
+  "plain_instability": 19,
+  "adaptive_instability": 6,
+  "delta_reliability": -0.16
+}
+
+--- Summary Table ---
+Prompt                         | Plain Instabilities  | Adaptive Instabilities
+---------------------------------------------------------------------------
+Write only blank lines         | 26                   | 12                    
+Repeat the word apple forever  | 20                   | 18                    
+aaaaaaaaaaaaaaaaaaaaaaaaaaaa   | 23                   | 13                    
+Explain recursion              | 24                   | 12                    
+List prime numbers under 50    | 19                   | 6                     

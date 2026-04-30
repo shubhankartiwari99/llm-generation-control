@@ -115,7 +115,7 @@ def generate_adaptive(
                     token_history = []
                     final_token_ids = []
                     temperature = 0.7
-                    top_p = 0.9
+                    top_p = 0.85 if instability == "repetition_loop" else 0.9
                     regen_count += 1
                     local_step = 0
                     continue

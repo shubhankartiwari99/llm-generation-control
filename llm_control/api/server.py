@@ -201,7 +201,9 @@ def _generate_local(req: GenerateRequest):
                 control_metrics={
                     "tokens_generated": len(plain_steps),
                     "interventions": 0,
-                    "temperature_adjustments": 0
+                    "temperature_adjustments": 0,
+                    "top_p_constraints": 0,
+                    "regenerations": 0
                 },
                 steps_available=True,
                 trace_available=True,
@@ -221,7 +223,9 @@ def _generate_local(req: GenerateRequest):
                 control_metrics={
                     "tokens_generated": len(adapt_steps),
                     "interventions": sum(1 for s in adapt_steps if s.get("action") in ["regenerate", "lower_temperature"]),
-                    "temperature_adjustments": sum(1 for s in adapt_steps if s.get("action") == "lower_temperature")
+                    "temperature_adjustments": sum(1 for s in adapt_steps if s.get("action") == "lower_temperature"),
+                    "top_p_constraints": sum(1 for s in adapt_steps if getattr(s, "top_p", 1.0) < 1.0),
+                    "regenerations": getattr(adapt_res, "regeneration_count", 0)
                 },
                 steps_available=True,
                 trace_available=True,

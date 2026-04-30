@@ -17,6 +17,8 @@ export interface ModeResponse {
     tokens_generated: number;
     interventions: number;
     temperature_adjustments: number;
+    top_p_constraints: number;
+    regenerations: number;
   };
   steps_available: boolean;
   trace_available: boolean;

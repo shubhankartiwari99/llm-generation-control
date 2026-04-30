@@ -57,6 +57,8 @@ List prime numbers under 50     | 19                  | 6
 > **Note on Model Capacity:**
 > The control system shows strong improvements in structured tasks, but limited effectiveness in extreme repetition and degenerate token loops on smaller models like DistilGPT2. Performance is significantly stronger on larger models (Mistral 7B / Qwen 7B), where richer token distributions make entropy-based control more effective.
 
+The controller modifies generation policy dynamically at the token level using entropy thresholds and instability classification, rather than relying on static decoding parameters.
+
 ## ⚖️ Tradeoffs & Control Cost
 
 The control loop introduces additional latency due to:
@@ -66,11 +68,13 @@ The control loop introduces additional latency due to:
 
 This system prioritizes output stability over raw throughput in adversarial scenarios.
 
-## 🛑 Limitations / When This Fails
+## 🛑 Known Limitations / When This Fails
 
+- Control effectiveness is reduced on smaller models with low entropy diversity (e.g., DistilGPT2)
+- Extreme repetition loops may require multiple interventions (regeneration + sampling constraint)
+- Reliability score reflects distribution stability, not semantic correctness
 - Requires access to token logits (not available in most hosted APIs)
 - Not optimized for low latency batch inference
-- Does not guarantee semantic correctness, only distribution stability
 
 ## 📊 Reliability Proxy Interpretation
 

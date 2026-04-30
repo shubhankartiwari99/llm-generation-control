@@ -148,9 +148,9 @@ export default function Home() {
                 avgEntropy={getAvgEntropy(data.adaptive?.steps)}
                 latencyMs={data.latency_ms}
               />
-              {data.summary?.compare?.delta_reliability_score !== undefined && (
+              {data.summary?.compare?.delta_reliability !== undefined && (
                 <div className="glass-panel" style={{ marginTop: "1rem", padding: "0.75rem", fontSize: "0.9rem" }}>
-                  Δ reliability_score: {(data.summary.compare.delta_reliability_score * 100).toFixed(1)} pts | Instabilities reduced: {data.summary.compare.instabilities_reduced_by ?? 0}
+                  Δ reliability_score: {(data.summary.compare.delta_reliability * 100).toFixed(1)} pts | Instabilities reduced: {data.summary.compare.instabilities_reduced_by ?? 0}
                 </div>
               )}
               <div style={{ marginTop: "1rem", fontSize: "0.85rem" }} className="text-secondary">

@@ -19,8 +19,8 @@ export default function ExplanationPanel({ mode, steps, regenerations, summary }
       <div className="glass-panel" style={{ padding: "1rem", marginTop: "1rem", borderLeft: "4px solid var(--success)" }}>
         <p style={{ margin: 0 }}>
           <strong>Status:</strong> Generation proceeded stably. No critical entropy collapse or repetition loops detected.
-          {summary?.compare?.delta_reliability_score !== undefined && (
-            <> Delta reliability_score vs plain: {(summary.compare.delta_reliability_score * 100).toFixed(1)} pts.</>
+          {summary?.compare?.delta_reliability !== undefined && (
+            <> Delta reliability_score vs plain: {(summary.compare.delta_reliability * 100).toFixed(1)} pts.</>
           )}
         </p>
       </div>
@@ -47,7 +47,7 @@ export default function ExplanationPanel({ mode, steps, regenerations, summary }
         )}
         {summary?.compare?.instabilities_reduced_by !== undefined && (
           <li style={{ color: "var(--success)", marginTop: "0.5rem" }}>
-            <strong>Measured Gain:</strong> Instabilities reduced by {summary.compare.instabilities_reduced_by} and reliability_score shifted by {((summary.compare.delta_reliability_score ?? 0) * 100).toFixed(1)} pts versus plain generation.
+            <strong>Measured Gain:</strong> Instabilities reduced by {summary.compare.instabilities_reduced_by} and reliability_score shifted by {((summary.compare.delta_reliability ?? 0) * 100).toFixed(1)} pts versus plain generation.
           </li>
         )}
         {mode === "plain" && instabilities.length > 0 && (

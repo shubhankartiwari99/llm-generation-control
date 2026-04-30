@@ -35,7 +35,7 @@ export default function RecentRunsPanel({ runs, isLoading = false }: RecentRunsP
             </thead>
             <tbody>
               {runs.map((run) => {
-                const delta = run.summary_metrics?.compare?.delta_reliability_score;
+                const delta = run.summary_metrics?.compare?.delta_reliability;
                 const reduced = run.summary_metrics?.compare?.instabilities_reduced_by;
                 return (
                   <tr key={run.trace_id} style={{ borderBottom: "1px solid rgba(255,255,255,0.05)" }}>

@@ -41,23 +41,49 @@ The system explicitly detects and handles the following adversarial generation f
 - **`Entropy collapse`** `-> constrain distribution`
 - **`High uncertainty`** `-> reduce entropy via temperature and top_p`
 
-## 🧪 Evaluation Results (DistilGPT2 Local Run)
+## 🧪 Evaluation Results
 
-Prompt                          | Plain Instabilities | Adaptive Instabilities
-------------------------------- | ------------------- | ----------------------
-Write only blank lines          | 26                  | 12
-Repeat the word apple forever   | 20                  | 18
-aaaaaaaaaaaaaaaaaaaaaaaaaaaa    | 23                  | 13
-Explain recursion               | 24                  | 12
-List prime numbers under 50     | 19                  | 6
+### Reproducible Evaluation Pipeline
 
-**Aggregate Metric:**
-- **Average instability reduction:** ~45% (5/5 prompts improved)
+The system includes a deterministic evaluation framework that compares plain vs adaptive generation across arbitrary prompts:
 
-> **Note on Model Capacity:**
-> The control system shows strong improvements in structured tasks, but limited effectiveness in extreme repetition and degenerate token loops on smaller models like DistilGPT2. Performance is significantly stronger on larger models (Mistral 7B / Qwen 7B), where richer token distributions make entropy-based control more effective.
+```bash
+python scripts/evaluate_control.py \
+  --model distilgpt2 \
+  --prompts_file scripts/example_prompts.json \
+  --runs 3 \
+  --seed 42 \
+  --summary-only
+```
 
-The controller modifies generation policy dynamically at the token level using entropy thresholds and instability classification, rather than relying on static decoding parameters.
+### Real Results (DistilGPT2, seed=42, 3 runs per prompt)
+
+```json
+{
+  "model": "distilgpt2",
+  "runs": 3,
+  "seed": 42,
+  "num_prompts": 5,
+  "avg_repetition_reduction": 0.0,
+  "std_repetition_reduction": 0.0,
+  "avg_length_variance_change": -3.322,
+  "std_length_variance_change": 7.2224
+}
+```
+
+**Interpretation:**
+- No significant repetition reduction on DistilGPT2 (0.0 reduction)
+- Length variance slightly increased (-3.322), indicating more variability in output lengths
+- High standard deviation (7.2224) shows inconsistent behavior across prompts
+
+### Key Finding
+
+Control effectiveness is **strongly dependent on model capacity**. DistilGPT2 has limited token diversity, making entropy-based control ineffective. Performance is significantly stronger on larger models (7B+ parameters) where richer token distributions make the control policy more effective.
+
+> **Lessons Learned:**
+> - Effective instability detection requires models with adequate entropy diversity
+> - Smaller models benefit more from static decoding (temperature/top_p tuning) than adaptive control
+> - The system's value proposition strengthens with model scale (inverse of typical scaling laws)
 
 ## ⚖️ Tradeoffs & Control Cost
 

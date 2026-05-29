@@ -36,21 +36,12 @@ export default function RootLayout({
             <div className="font-headline-lg text-headline-lg font-bold text-on-surface">
               LLM Control
             </div>
-            {/* Navigation */}
+            {/* Navigation (simplified for single-page utility) */}
             <nav className="hidden md:flex items-center gap-6">
               <a className="text-primary border-b-2 border-primary pb-1 font-label-md text-label-md hover:bg-surface-container transition-colors duration-200 scale-95 active:opacity-80" href="#">Dashboard</a>
-              <a className="text-on-surface-variant hover:text-on-surface font-label-md text-label-md hover:bg-surface-container transition-colors duration-200 scale-95 active:opacity-80" href="#">Evaluations</a>
-              <a className="text-on-surface-variant hover:text-on-surface font-label-md text-label-md hover:bg-surface-container transition-colors duration-200 scale-95 active:opacity-80" href="#">Traces</a>
-              <a className="text-on-surface-variant hover:text-on-surface font-label-md text-label-md hover:bg-surface-container transition-colors duration-200 scale-95 active:opacity-80" href="#">Models</a>
             </nav>
-            {/* Trailing Icons */}
+            {/* Trailing Icons (Removed placeholders) */}
             <div className="flex items-center gap-4 text-primary">
-              <button className="hover:bg-surface-container transition-colors duration-200 scale-95 active:opacity-80 p-2 rounded-full flex items-center justify-center">
-                <span className="material-symbols-outlined" style={{fontFamily: 'Material Symbols Outlined'}}>settings</span>
-              </button>
-              <button className="hover:bg-surface-container transition-colors duration-200 scale-95 active:opacity-80 p-2 rounded-full flex items-center justify-center">
-                <span className="material-symbols-outlined" style={{fontFamily: 'Material Symbols Outlined'}}>account_circle</span>
-              </button>
             </div>
           </div>
         </header>

@@ -8,22 +8,22 @@ interface StepTableProps {
 
 export default function StepTable({ steps }: StepTableProps) {
   if (!steps || steps.length === 0) {
-    return <div className="text-secondary text-center p-4">No steps to display</div>;
+    return <div className="text-text-secondary text-center p-4 font-body-md text-body-md">No steps to display</div>;
   }
 
   return (
-    <div style={{ overflowX: "auto" }}>
-      <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.9rem" }}>
+    <div className="w-full">
+      <table className="w-full border-collapse font-body-md text-body-md">
         <thead>
-          <tr style={{ borderBottom: "1px solid var(--border)", textAlign: "left" }}>
-            <th style={{ padding: "0.75rem 0.5rem", width: "15%" }}>Step</th>
-            <th style={{ padding: "0.75rem 0.5rem", width: "45%" }}>Token</th>
-            <th style={{ padding: "0.75rem 0.5rem", width: "10%" }}>Entropy</th>
-            <th style={{ padding: "0.75rem 0.5rem", width: "20%" }}>⚠️ Alert</th>
-            <th style={{ padding: "0.75rem 0.5rem", width: "15%" }}>Action</th>
+          <tr className="border-b border-border-subtle text-left text-text-secondary">
+            <th className="py-3 px-2 w-[15%] font-medium">Step</th>
+            <th className="py-3 px-2 w-[45%] font-medium">Token</th>
+            <th className="py-3 px-2 w-[10%] font-medium">Entropy</th>
+            <th className="py-3 px-2 w-[20%] font-medium">⚠️ Alert</th>
+            <th className="py-3 px-2 w-[15%] font-medium">Action</th>
           </tr>
         </thead>
-        <tbody>
+        <tbody className="divide-y divide-border-subtle">
           {steps.map((step, idx) => {
             const hasInstability = step.instability !== null;
             const isLowEntropy = step.entropy < 1;
@@ -31,37 +31,32 @@ export default function StepTable({ steps }: StepTableProps) {
             const isRegeneration = step.action === "regenerate";
 
             const rowStyle = {
-              borderBottom: "1px solid rgba(255,255,255,0.05)",
               backgroundColor: isRegeneration
-                ? "rgba(34, 197, 94, 0.12)"
+                ? "rgba(16, 185, 129, 0.12)"
                 : hasInstability
                   ? "rgba(239, 68, 68, 0.1)"
                   : "transparent",
             };
             
-            let entropyColor = "var(--text-primary)";
-            if (isLowEntropy) entropyColor = "var(--warning)";
-            if (isHighEntropy) entropyColor = "var(--success)";
+            let entropyColor = "text-text-primary";
+            if (isLowEntropy) entropyColor = "text-[#f59e0b]";
+            if (isHighEntropy) entropyColor = "text-[#10B981]";
 
             return (
-              <tr key={idx} style={rowStyle}>
-                <td style={{ padding: "0.5rem", color: "var(--text-secondary)" }}>{idx}</td>
-                <td style={{ padding: "0.5rem", fontFamily: "monospace" }}>
-                  <span style={{ 
-                    backgroundColor: "rgba(0,0,0,0.3)", 
-                    padding: "0.1rem 0.3rem", 
-                    borderRadius: "4px" 
-                  }}>
+              <tr key={idx} style={rowStyle} className="hover:bg-surface-elevated/50 transition-colors">
+                <td className="py-2 px-2 text-text-secondary">{idx}</td>
+                <td className="py-2 px-2">
+                  <span className="bg-black/30 px-1.5 py-0.5 rounded text-on-surface font-label-md text-label-md inline-block">
                     {step.token}
                   </span>
                 </td>
-                <td style={{ padding: "0.5rem", color: entropyColor, fontWeight: 500 }}>
+                <td className={`py-2 px-2 font-medium ${entropyColor}`}>
                   {step.entropy.toFixed(3)}
                 </td>
-                <td style={{ padding: "0.5rem", color: "var(--danger)" }}>
+                <td className="py-2 px-2 text-[#ef4444]">
                   {hasInstability ? `🔴 ${step.instability}` : isLowEntropy ? "🟡 low_entropy" : ""}
                 </td>
-                <td style={{ padding: "0.5rem", color: step.action !== "continue" ? "var(--warning)" : "var(--text-secondary)" }}>
+                <td className={`py-2 px-2 ${step.action !== "continue" ? "text-[#f59e0b]" : "text-text-secondary"}`}>
                   {isRegeneration ? "🟢 regenerate" : step.action || "continue"}
                 </td>
               </tr>

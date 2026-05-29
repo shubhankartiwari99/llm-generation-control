@@ -1,6 +1,5 @@
 "use client";
 
-import { Activity } from "lucide-react";
 import { RecentRun } from "@/types";
 
 interface RecentRunsPanelProps {
@@ -10,41 +9,41 @@ interface RecentRunsPanelProps {
 
 export default function RecentRunsPanel({ runs, isLoading = false }: RecentRunsPanelProps) {
   return (
-    <div className="glass-panel panel-content mt-2">
-      <h3 style={{ marginBottom: "1rem" }}>Recent Runs</h3>
+    <section className="bg-surface-container-lowest border border-border-subtle rounded-xl p-6 flex flex-col gap-4">
+      <h3 className="font-headline-md text-headline-md text-text-primary m-0">Recent Runs</h3>
       {isLoading ? (
-        <div className="empty-state">
-          <Activity size={18} />
-          <span>Loading run history...</span>
+        <div className="flex flex-col items-center justify-center gap-3 text-text-secondary opacity-70 p-8">
+          <span className="material-symbols-outlined animate-spin" style={{fontFamily: 'Material Symbols Outlined'}}>sync</span>
+          <p className="font-label-sm text-label-sm m-0">Loading run history...</p>
         </div>
       ) : runs.length === 0 ? (
-        <div className="empty-state">
-          <Activity size={18} />
-          <span>No run history yet. Run inference to populate history.</span>
+        <div className="flex flex-col items-center justify-center gap-3 text-text-secondary opacity-70 p-8">
+          <span className="material-symbols-outlined" style={{fontFamily: 'Material Symbols Outlined'}}>history</span>
+          <p className="font-label-sm text-label-sm m-0">No run history yet. Run inference to populate history.</p>
         </div>
       ) : (
-        <div className="scroll-x">
-          <table className="table-base">
+        <div className="overflow-x-auto w-full">
+          <table className="w-full border-collapse font-body-md text-body-md">
             <thead>
-              <tr className="table-head-row">
-                <th style={{ padding: "0.6rem 0.5rem" }}>Prompt</th>
-                <th style={{ padding: "0.6rem 0.5rem" }}>Mode</th>
-                <th style={{ padding: "0.6rem 0.5rem" }}>Δ Reliability</th>
-                <th style={{ padding: "0.6rem 0.5rem" }}>Instability Reduction</th>
+              <tr className="border-b border-border-subtle text-left text-text-secondary">
+                <th className="py-3 px-2 font-medium">Prompt</th>
+                <th className="py-3 px-2 font-medium">Mode</th>
+                <th className="py-3 px-2 font-medium">Δ Reliability</th>
+                <th className="py-3 px-2 font-medium">Instability Reduction</th>
               </tr>
             </thead>
-            <tbody>
+            <tbody className="divide-y divide-border-subtle">
               {runs.map((run) => {
                 const delta = run.summary_metrics?.compare?.delta_reliability;
                 const reduced = run.summary_metrics?.compare?.instabilities_reduced_by;
                 return (
-                  <tr key={run.trace_id} style={{ borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
-                    <td style={{ padding: "0.6rem 0.5rem", maxWidth: "320px" }}>{run.prompt}</td>
-                    <td style={{ padding: "0.6rem 0.5rem" }}>{run.mode}</td>
-                    <td style={{ padding: "0.6rem 0.5rem" }}>
+                  <tr key={run.trace_id} className="hover:bg-surface-elevated/50 transition-colors">
+                    <td className="py-3 px-2 max-w-[320px] truncate" title={run.prompt}>{run.prompt}</td>
+                    <td className="py-3 px-2 capitalize">{run.mode}</td>
+                    <td className="py-3 px-2 font-medium">
                       {typeof delta === "number" ? `${(delta * 100).toFixed(1)} pts` : "-"}
                     </td>
-                    <td style={{ padding: "0.6rem 0.5rem" }}>
+                    <td className="py-3 px-2 font-medium">
                       {typeof reduced === "number" ? reduced : "-"}
                     </td>
                   </tr>
@@ -54,6 +53,6 @@ export default function RecentRunsPanel({ runs, isLoading = false }: RecentRunsP
           </table>
         </div>
       )}
-    </div>
+    </section>
   );
 }

@@ -81,11 +81,11 @@ export default function Home() {
     : 0;
 
   return (
-    <main className="container">
-      <div className="hero-header">
-        <h1>LLM Generation Control Dashboard</h1>
-        <p className="text-secondary">Interactive control layer with real-time hardware observability (Mistral 7B on MPS).</p>
-      </div>
+    <main className="flex-1 w-full max-w-7xl mx-auto px-gutter py-margin-desktop flex flex-col gap-10">
+      <section className="text-center flex flex-col items-center gap-2">
+        <h1 className="font-headline-xl text-headline-xl text-text-primary">LLM Generation Control Dashboard</h1>
+        <p className="font-body-md text-body-md text-text-secondary">Interactive control layer with real-time hardware observability (Mistral 7B on MPS).</p>
+      </section>
 
       {errorMessage && (
         <StatusBanner tone="error">
@@ -99,48 +99,53 @@ export default function Home() {
         onRun={runInference} 
         isLoading={isLoading} 
       />
-      <div className="mt-1">
-        <ModeToggle mode={mode} setMode={setMode} isLoading={isLoading} />
-      </div>
+      
+      <ModeToggle mode={mode} setMode={setMode} isLoading={isLoading} />
 
-      <div className="section mt-2">
-        <SectionHeader title="Generation Output" subtitle={`Mode: ${mode}`} />
-      </div>
-      <div className="panels-grid">
-        <OutputPanel 
-          title="Plain Generation" 
-          output={data?.plain?.text || ""} 
-          steps={data?.plain?.steps}
-          isLoading={isLoading && !data} 
-        />
-        <OutputPanel 
-          title="Adaptive Generation (Controlled)" 
-          output={data?.adaptive?.text || ""} 
-          steps={data?.adaptive?.steps}
-          isLoading={isLoading && !data} 
-        />
-      </div>
+      <section className="flex flex-col gap-4">
+        <div className="flex justify-between items-end">
+          <h2 className="font-headline-md text-headline-md text-text-primary">Generation Output</h2>
+          <span className="font-label-sm text-label-sm text-text-secondary">Mode: {mode}</span>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <OutputPanel 
+            title="Plain Generation" 
+            output={data?.plain?.text || ""} 
+            steps={data?.plain?.steps}
+            isLoading={isLoading && !data} 
+          />
+          <OutputPanel 
+            title="Adaptive Generation (Controlled)" 
+            output={data?.adaptive?.text || ""} 
+            steps={data?.adaptive?.steps}
+            isLoading={isLoading && !data} 
+          />
+        </div>
+      </section>
 
-      <div className="section mt-2">
-        <SectionHeader title="Trace Analysis" subtitle="Token-level entropy + interventions" />
+      <section className="flex flex-col gap-4">
+        <div className="flex justify-between items-end">
+          <h2 className="font-headline-md text-headline-md text-text-primary">Trace Analysis</h2>
+          <span className="font-label-sm text-label-sm text-text-secondary">Token-level entropy + interventions</span>
+        </div>
         <EntropyChart 
           plainSteps={data?.plain?.steps}
           adaptiveSteps={data?.adaptive?.steps}
         />
-      </div>
+      </section>
 
       {data && (
         <>
           {/* Step Trace Table - Showing Adaptive trace details */}
-          <div className="glass-panel panel-content mt-2" style={{ maxHeight: "400px", overflowY: "auto" }}>
-            <h3 style={{ margin: "0 0 1rem 0" }}>Adaptive Step Trace</h3>
+          <section className="bg-surface-container-lowest border border-border-subtle rounded-xl p-6 flex flex-col gap-4 max-h-[400px] overflow-y-auto scroll-x">
+            <h3 className="font-headline-md text-headline-md text-text-primary m-0 mb-2">Adaptive Step Trace</h3>
             <StepTable steps={data.adaptive?.steps || []} />
-          </div>
+          </section>
 
-          <div className="panels-grid" style={{ marginTop: "2rem" }}>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-2">
             {/* Metrics Panel */}
-            <div>
-              <h3 style={{ marginBottom: "1rem" }}>Performance Metrics</h3>
+            <div className="flex flex-col gap-4">
+              <h3 className="font-headline-md text-headline-md text-text-primary m-0">Performance Metrics</h3>
               <MetricsPanel 
                 reliability_score={data.adaptive?.reliability_score ?? null}
                 instabilityCount={getInstabilityCount(data.adaptive?.steps)}
@@ -149,18 +154,18 @@ export default function Home() {
                 latencyMs={data.latency_ms}
               />
               {data.summary?.compare?.delta_reliability !== undefined && (
-                <div className="glass-panel" style={{ marginTop: "1rem", padding: "0.75rem", fontSize: "0.9rem" }}>
+                <div className="bg-surface-container border border-border-subtle p-3 rounded-lg font-body-md text-body-md text-on-surface">
                   Δ reliability_score: {(data.summary.compare.delta_reliability * 100).toFixed(1)} pts | Instabilities reduced: {data.summary.compare.instabilities_reduced_by ?? 0}
                 </div>
               )}
-              <div style={{ marginTop: "1rem", fontSize: "0.85rem" }} className="text-secondary">
+              <div className="font-label-sm text-label-sm text-text-secondary">
                 Hardware: {data.model.toUpperCase()} ({data.device.toUpperCase()})
               </div>
             </div>
 
             {/* Insight/Explanation Panel */}
-            <div>
-              <h3 style={{ marginBottom: "1rem" }}>System Insights</h3>
+            <div className="flex flex-col gap-4">
+              <h3 className="font-headline-md text-headline-md text-text-primary m-0">System Insights</h3>
               <ExplanationPanel 
                 mode={mode}
                 steps={data.adaptive?.steps || []}
@@ -172,11 +177,16 @@ export default function Home() {
         </>
       )}
 
-      <div className="actions-end mt-2">
-        <button onClick={() => void fetchRecentRuns()} disabled={isLoading}>
+      <section className="flex justify-end pt-4">
+        <button 
+          onClick={() => void fetchRecentRuns()} 
+          disabled={isLoading}
+          className="bg-primary-container text-on-primary-container font-label-md text-label-md px-6 py-2.5 rounded-lg hover:bg-inverse-primary transition-colors focus:ring-2 focus:ring-primary-container focus:ring-offset-2 focus:ring-offset-surface-deep disabled:opacity-50"
+        >
           {isHistoryLoading ? "Refreshing..." : "Refresh Run History"}
         </button>
-      </div>
+      </section>
+      
       <RecentRunsPanel runs={recentRuns} isLoading={isHistoryLoading} />
     </main>
   );

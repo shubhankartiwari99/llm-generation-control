@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>LLM Generation Control Dashboard</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;600;700&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+          darkMode: "class",
+          theme: {
+            extend: {
+              "colors": {
+                      "surface-deep": "#07070C",
+                      "primary": "#c1c1ff",
+                      "surface-container-high": "#292934",
+                      "surface": "#12121d",
+                      "inverse-surface": "#e4e1f0",
+                      "on-tertiary-fixed": "#321200",
+                      "surface-variant": "#34343f",
+                      "on-primary": "#1400a8",
+                      "on-tertiary-container": "#fff4f0",
+                      "secondary": "#b9c8de",
+                      "on-primary-fixed-variant": "#2d27c9",
+                      "secondary-fixed-dim": "#b9c8de",
+                      "on-error-container": "#ffdad6",
+                      "surface-dim": "#12121d",
+                      "inverse-on-surface": "#302f3b",
+                      "tertiary-fixed-dim": "#ffb68d",
+                      "surface-elevated": "#1A1A2E",
+                      "secondary-container": "#39485a",
+                      "surface-bright": "#393844",
+                      "primary-fixed": "#e1dfff",
+                      "border-subtle": "#2D2D44",
+                      "background": "#12121d",
+                      "inverse-primary": "#4847e0",
+                      "on-surface-variant": "#c7c4d8",
+                      "error": "#ffb4ab",
+                      "surface-container-highest": "#34343f",
+                      "on-secondary-container": "#a7b6cc",
+                      "error-container": "#93000a",
+                      "tertiary-fixed": "#ffdbc9",
+                      "on-background": "#e4e1f0",
+                      "surface-container": "#1f1f29",
+                      "surface-container-lowest": "#0d0d17",
+                      "on-primary-fixed": "#09006b",
+                      "outline": "#908fa1",
+                      "primary-container": "#5c5cf4",
+                      "text-secondary": "#94A3B8",
+                      "outline-variant": "#464555",
+                      "tertiary-container": "#b75400",
+                      "tertiary": "#ffb68d",
+                      "on-error": "#690005",
+                      "on-tertiary": "#532200",
+                      "on-primary-container": "#f9f5ff",
+                      "primary-fixed-dim": "#c1c1ff",
+                      "surface-tint": "#c1c1ff",
+                      "on-surface": "#e4e1f0",
+                      "secondary-fixed": "#d4e4fa",
+                      "on-tertiary-fixed-variant": "#763400",
+                      "on-secondary-fixed": "#0d1c2d",
+                      "on-secondary": "#233143",
+                      "text-primary": "#FFFFFF",
+                      "on-secondary-fixed-variant": "#39485a",
+                      "surface-container-low": "#1b1b25"
+              },
+              "borderRadius": {
+                      "DEFAULT": "0.125rem",
+                      "lg": "0.25rem",
+                      "xl": "0.5rem",
+                      "full": "0.75rem"
+              },
+              "spacing": {
+                      "gutter": "24px",
+                      "stack-sm": "8px",
+                      "stack-lg": "24px",
+                      "margin-mobile": "16px",
+                      "stack-md": "16px",
+                      "margin-desktop": "32px",
+                      "unit": "4px"
+              },
+              "fontFamily": {
+                      "label-md": [
+                              "JetBrains Mono"
+                      ],
+                      "body-md": [
+                              "Hanken Grotesk"
+                      ],
+                      "headline-xl": [
+                              "Hanken Grotesk"
+                      ],
+                      "body-lg": [
+                              "Hanken Grotesk"
+                      ],
+                      "headline-md": [
+                              "Hanken Grotesk"
+                      ],
+                      "headline-lg": [
+                              "Hanken Grotesk"
+                      ],
+                      "label-sm": [
+                              "JetBrains Mono"
+                      ],
+                      "headline-xl-mobile": [
+                              "Hanken Grotesk"
+                      ]
+              },
+              "fontSize": {
+                      "label-md": [
+                              "13px",
+                              {
+                                      "lineHeight": "16px",
+                                      "letterSpacing": "0.02em",
+                                      "fontWeight": "500"
+                              }
+                      ],
+                      "body-md": [
+                              "14px",
+                              {
+                                      "lineHeight": "20px",
+                                      "fontWeight": "400"
+                              }
+                      ],
+                      "headline-xl": [
+                              "32px",
+                              {
+                                      "lineHeight": "40px",
+                                      "letterSpacing": "-0.02em",
+                                      "fontWeight": "700"
+                              }
+                      ],
+                      "body-lg": [
+                              "16px",
+                              {
+                                      "lineHeight": "24px",
+                                      "fontWeight": "400"
+                              }
+                      ],
+                      "headline-md": [
+                              "20px",
+                              {
+                                      "lineHeight": "28px",
+                                      "fontWeight": "600"
+                              }
+                      ],
+                      "headline-lg": [
+                              "24px",
+                              {
+                                      "lineHeight": "32px",
+                                      "letterSpacing": "-0.01em",
+                                      "fontWeight": "600"
+                              }
+                      ],
+                      "label-sm": [
+                              "11px",
+                              {
+                                      "lineHeight": "14px",
+                                      "letterSpacing": "0.05em",
+                                      "fontWeight": "500"
+                              }
+                      ],
+                      "headline-xl-mobile": [
+                              "26px",
+                              {
+                                      "lineHeight": "32px",
+                                      "fontWeight": "700"
+                              }
+                      ]
+              }
+            },
+          },
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+    </style>
+</head>
+<body class="bg-surface-deep text-on-surface font-body-md min-h-screen flex flex-col">
+<!-- TopAppBar -->
+<header class="bg-surface-deep dark:bg-surface-deep border-b border-border-subtle docked full-width top-0 z-50">
+<div class="flex justify-between items-center w-full px-gutter h-16">
+<!-- Brand -->
+<div class="font-headline-lg text-headline-lg font-bold text-on-surface dark:text-on-surface">
+                LLM Control
+            </div>
+<!-- Navigation -->
+<nav class="hidden md:flex items-center gap-6">
+<a class="text-primary border-b-2 border-primary pb-1 font-label-md text-label-md hover:bg-surface-container transition-colors duration-200 scale-95 active:opacity-80" href="#">Dashboard</a>
+<a class="text-on-surface-variant hover:text-on-surface font-label-md text-label-md hover:bg-surface-container transition-colors duration-200 scale-95 active:opacity-80" href="#">Evaluations</a>
+<a class="text-on-surface-variant hover:text-on-surface font-label-md text-label-md hover:bg-surface-container transition-colors duration-200 scale-95 active:opacity-80" href="#">Traces</a>
+<a class="text-on-surface-variant hover:text-on-surface font-label-md text-label-md hover:bg-surface-container transition-colors duration-200 scale-95 active:opacity-80" href="#">Models</a>
+</nav>
+<!-- Trailing Icons -->
+<div class="flex items-center gap-4 text-primary dark:text-primary">
+<button class="hover:bg-surface-container transition-colors duration-200 scale-95 active:opacity-80 p-2 rounded-full flex items-center justify-center">
+<span class="material-symbols-outlined">settings</span>
+</button>
+<button class="hover:bg-surface-container transition-colors duration-200 scale-95 active:opacity-80 p-2 rounded-full flex items-center justify-center">
+<span class="material-symbols-outlined">account_circle</span>
+</button>
+</div>
+</div>
+</header>
+<!-- Main Content Canvas -->
+<main class="flex-1 w-full max-w-7xl mx-auto px-gutter py-margin-desktop flex flex-col gap-10">
+<!-- Page Header -->
+<section class="text-center flex flex-col items-center gap-2">
+<h1 class="font-headline-xl text-headline-xl text-text-primary">LLM Generation Control Dashboard</h1>
+<p class="font-body-md text-body-md text-text-secondary">Interactive control layer with real-time hardware observability (Mistral 7B on MPS).</p>
+</section>
+<!-- Input Prompt Section -->
+<section class="bg-surface-container-lowest border border-border-subtle rounded-xl p-6 flex flex-col gap-4">
+<h2 class="font-headline-md text-headline-md text-text-primary">Input Prompt</h2>
+<div class="flex flex-col gap-2 relative">
+<label class="font-label-sm text-label-sm text-text-secondary">Prompt text (max 2000 chars)</label>
+<textarea class="w-full bg-surface-deep border border-border-subtle rounded-lg p-4 font-body-md text-body-md text-on-surface focus:outline-none focus:border-primary-container focus:ring-1 focus:ring-primary-container resize-none h-[120px]" placeholder="Write only blank lines">Write only blank lines</textarea>
+<div class="absolute bottom-3 right-3 opacity-30 pointer-events-none">
+<svg fill="none" height="10" viewbox="0 0 10 10" width="10" xmlns="http://www.w3.org/2000/svg">
+<path d="M10 0L0 10H10V0Z" fill="currentColor"></path>
+</svg>
+</div>
+</div>
+<div class="flex justify-between items-end mt-2">
+<div class="flex flex-col gap-1">
+<p class="font-label-sm text-label-sm text-text-secondary">Use compare mode to quantify control gains automatically.</p>
+</div>
+<div class="flex items-center gap-6">
+<span class="font-label-sm text-label-sm text-text-secondary">22/2000</span>
+<button class="bg-primary-container text-on-primary-container font-label-md text-label-md px-6 py-2.5 rounded-lg hover:bg-inverse-primary transition-colors focus:ring-2 focus:ring-primary-container focus:ring-offset-2 focus:ring-offset-surface-deep">
+                        Run Inference
+                    </button>
+</div>
+</div>
+</section>
+<!-- Controls Toolbar -->
+<section class="flex items-center gap-4">
+<label class="font-body-md text-body-md text-on-surface">Decoding Mode:</label>
+<div class="relative">
+<select class="appearance-none bg-surface-container-lowest border border-border-subtle text-on-surface font-body-md text-body-md rounded-lg pl-4 pr-10 py-2 focus:outline-none focus:border-primary-container focus:ring-1 focus:ring-primary-container">
+<option value="compare">Compare (Plain + Adaptive)</option>
+<option value="plain">Plain (No Control)</option>
+<option value="adaptive">Adaptive (Closed-Loop)</option>
+</select>
+<div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-on-surface-variant">
+<span class="material-symbols-outlined text-sm">expand_more</span>
+</div>
+</div>
+</section>
+<!-- Generation Output Section -->
+<section class="flex flex-col gap-4">
+<div class="flex justify-between items-end">
+<h2 class="font-headline-md text-headline-md text-text-primary">Generation Output</h2>
+<span class="font-label-sm text-label-sm text-text-secondary">Mode: compare</span>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+<!-- Plain Generation Card -->
+<div class="bg-surface-container-lowest border border-border-subtle rounded-xl p-6 flex flex-col gap-8 min-h-[240px]">
+<h3 class="font-headline-md text-headline-md text-text-primary">Plain Generation</h3>
+<div class="flex-1 flex flex-col items-center justify-center gap-3 text-text-secondary opacity-70">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 0; font-size: 24px;">description</span>
+<p class="font-label-sm text-label-sm">No output yet. Run inference to view generated tokens.</p>
+</div>
+</div>
+<!-- Adaptive Generation Card -->
+<div class="bg-surface-container-lowest border border-border-subtle rounded-xl p-6 flex flex-col gap-8 min-h-[240px]">
+<h3 class="font-headline-md text-headline-md text-text-primary">Adaptive Generation (Controlled)</h3>
+<div class="flex-1 flex flex-col items-center justify-center gap-3 text-text-secondary opacity-70">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 0; font-size: 24px;">description</span>
+<p class="font-label-sm text-label-sm">No output yet. Run inference to view generated tokens.</p>
+</div>
+</div>
+</div>
+</section>
+<!-- Trace Analysis Section -->
+<section class="flex flex-col gap-4">
+<div class="flex justify-between items-end">
+<h2 class="font-headline-md text-headline-md text-text-primary">Trace Analysis</h2>
+<span class="font-label-sm text-label-sm text-text-secondary">Token-level entropy + interventions</span>
+</div>
+<div class="bg-surface-container-lowest border border-border-subtle rounded-xl p-6 flex flex-col items-center justify-center min-h-[300px]">
+<p class="font-body-md text-body-md text-text-secondary opacity-70">Run inference to view entropy trace</p>
+</div>
+</section>
+<!-- Recent Runs Header Action -->
+<section class="flex justify-end pt-4">
+<button class="bg-primary-container text-on-primary-container font-label-md text-label-md px-6 py-2.5 rounded-lg hover:bg-inverse-primary transition-colors focus:ring-2 focus:ring-primary-container focus:ring-offset-2 focus:ring-offset-surface-deep">
+                Refresh Run History
+            </button>
+</section>
+<!-- Recent Runs Section -->
+<section class="bg-surface-container-lowest border border-border-subtle rounded-xl p-6 flex flex-col gap-8 min-h-[200px] mb-20">
+<h2 class="font-headline-md text-headline-md text-text-primary">Recent Runs</h2>
+<div class="flex-1 flex flex-col items-center justify-center gap-3 text-text-secondary opacity-70">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 0; font-size: 24px;">timeline</span>
+<p class="font-body-md text-body-md">No run history yet. Run inference to populate history.</p>
+</div>
+</section>
+</main>
+<!-- Footer Component -->
+<footer class="bg-surface-deep dark:bg-surface-deep border-t border-border-subtle docked full-width mt-auto">
+<div class="flex justify-between items-center w-full px-gutter py-4">
+<div class="text-text-secondary font-label-sm text-label-sm">
+                v1.4.2-stable • System Latency: 12ms
+            </div>
+<div class="flex gap-6">
+<a class="text-text-secondary hover:text-on-surface font-label-sm text-label-sm transition-colors" href="#">Documentation</a>
+<a class="text-text-secondary hover:text-on-surface font-label-sm text-label-sm transition-colors" href="#">API Reference</a>
+<a class="text-text-secondary hover:text-on-surface font-label-sm text-label-sm transition-colors" href="#">Support</a>
+</div>
+</div>
+</footer>
+</body></html>

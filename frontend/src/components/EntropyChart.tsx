@@ -39,8 +39,8 @@ interface DotRenderProps {
 export default function EntropyChart({ plainSteps, adaptiveSteps }: EntropyChartProps) {
   if ((!plainSteps || plainSteps.length === 0) && (!adaptiveSteps || adaptiveSteps.length === 0)) {
     return (
-      <div className="glass-panel panel-content" style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "300px" }}>
-        <span className="text-secondary">Run inference to view entropy trace</span>
+      <div className="bg-surface-container-lowest border border-border-subtle rounded-xl p-6 flex flex-col items-center justify-center min-h-[300px]">
+        <p className="font-body-md text-body-md text-text-secondary opacity-70">Run inference to view entropy trace</p>
       </div>
     );
   }
@@ -66,22 +66,22 @@ export default function EntropyChart({ plainSteps, adaptiveSteps }: EntropyChart
   }
 
   return (
-    <div className="glass-panel panel-content" style={{ height: "400px" }}>
-      <div className="section-header">
-        <h3 style={{ marginBottom: "1rem" }}>Entropy Trace Comparison</h3>
-        <div className="small-note" aria-label="chart legend">
+    <div className="bg-surface-container-lowest border border-border-subtle rounded-xl p-6 flex flex-col h-[400px]">
+      <div className="flex justify-between items-center mb-4">
+        <h3 className="font-headline-md text-headline-md text-text-primary m-0">Entropy Trace Comparison</h3>
+        <div className="font-label-sm text-label-sm text-text-secondary" aria-label="chart legend">
           🔴 instability · 🟡 low entropy · 🟢 regeneration
         </div>
       </div>
-      <div style={{ flex: 1, width: "100%", minHeight: 0 }}>
+      <div className="flex-1 w-full min-h-0">
         <ResponsiveContainer width="100%" height="100%">
           <LineChart data={data} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
-            <XAxis dataKey="step" stroke="#94a3b8" />
-            <YAxis stroke="#94a3b8" />
+            <CartesianGrid strokeDasharray="3 3" stroke="#2D2D44" />
+            <XAxis dataKey="step" stroke="#94A3B8" tick={{fontFamily: 'JetBrains Mono', fontSize: 11}} />
+            <YAxis stroke="#94A3B8" tick={{fontFamily: 'JetBrains Mono', fontSize: 11}} />
             <Tooltip
-              contentStyle={{ backgroundColor: "#1e1e2d", border: "1px solid #333", borderRadius: "8px" }}
-              itemStyle={{ color: "#e2e8f0" }}
+              contentStyle={{ backgroundColor: "#1A1A2E", border: "1px solid #2D2D44", borderRadius: "8px", fontFamily: 'JetBrains Mono', fontSize: '13px' }}
+              itemStyle={{ color: "#FFFFFF" }}
               formatter={(value, name, props) => {
                 const isPlain = name === "plainEntropy";
                 const token = isPlain ? props.payload.plainToken : props.payload.adaptiveToken;
@@ -89,22 +89,22 @@ export default function EntropyChart({ plainSteps, adaptiveSteps }: EntropyChart
                 return [`${Number(value).toFixed(2)} ("${token}")`, label];
               }}
             />
-            <Legend wrapperStyle={{ paddingTop: "20px" }} />
+            <Legend wrapperStyle={{ paddingTop: "20px", fontFamily: 'Hanken Grotesk', fontSize: '14px' }} />
             {/* Danger Zone Reference */}
-            <ReferenceLine y={1.0} stroke="#ef4444" strokeDasharray="3 3" label={{ position: 'insideTopLeft', value: 'Low Entropy Lock Zone', fill: '#ef4444', fontSize: 12 }} />
+            <ReferenceLine y={1.0} stroke="#ffb4ab" strokeDasharray="3 3" label={{ position: 'insideTopLeft', value: 'Low Entropy Lock Zone', fill: '#ffb4ab', fontSize: 12, fontFamily: 'JetBrains Mono' }} />
             
             {plainSteps && plainSteps.length > 0 && (
               <Line
                 type="monotone"
                 dataKey="plainEntropy"
                 name="plainEntropy"
-                stroke="#94a3b8" // Grey for plain
+                stroke="#94A3B8" // Grey for plain
                 strokeWidth={2}
                 dot={(props: DotRenderProps) => {
                   const { cx, cy, payload } = props;
-                  if (payload.plainInstability) return <circle key={`p-${props.index}`} cx={cx} cy={cy} r={6} fill="#ef4444" stroke="none" />;
-                  if (payload.plainEntropy !== undefined && payload.plainEntropy < 1) return <circle key={`p-${props.index}`} cx={cx} cy={cy} r={4} fill="#f59e0b" stroke="none" />;
-                  return <circle key={`p-${props.index}`} cx={cx} cy={cy} r={3} fill="#94a3b8" stroke="none" />;
+                  if (payload.plainInstability) return <circle key={`p-${props.index}`} cx={cx} cy={cy} r={6} fill="#ffb4ab" stroke="none" />;
+                  if (payload.plainEntropy !== undefined && payload.plainEntropy < 1) return <circle key={`p-${props.index}`} cx={cx} cy={cy} r={4} fill="#ffb68d" stroke="none" />;
+                  return <circle key={`p-${props.index}`} cx={cx} cy={cy} r={3} fill="#94A3B8" stroke="none" />;
                 }}
                 activeDot={{ r: 6 }}
               />
@@ -115,14 +115,14 @@ export default function EntropyChart({ plainSteps, adaptiveSteps }: EntropyChart
                 type="monotone"
                 dataKey="adaptiveEntropy"
                 name="adaptiveEntropy"
-                stroke="#6366f1" // Indigo for adaptive
+                stroke="#c1c1ff" // Primary for adaptive
                 strokeWidth={2}
                 dot={(props: DotRenderProps) => {
                   const { cx, cy, payload } = props;
-                  if (payload.adaptiveInstability) return <circle key={`a-${props.index}`} cx={cx} cy={cy} r={6} fill="#ef4444" stroke="none" />;
-                  if (payload.adaptiveAction === "regenerate") return <circle key={`a-${props.index}`} cx={cx} cy={cy} r={5} fill="#22c55e" stroke="none" />;
-                  if (payload.adaptiveEntropy !== undefined && payload.adaptiveEntropy < 1) return <circle key={`a-${props.index}`} cx={cx} cy={cy} r={4} fill="#f59e0b" stroke="none" />;
-                  return <circle key={`a-${props.index}`} cx={cx} cy={cy} r={3} fill="#6366f1" stroke="none" />;
+                  if (payload.adaptiveInstability) return <circle key={`a-${props.index}`} cx={cx} cy={cy} r={6} fill="#ffb4ab" stroke="none" />;
+                  if (payload.adaptiveAction === "regenerate") return <circle key={`a-${props.index}`} cx={cx} cy={cy} r={5} fill="#10B981" stroke="none" />;
+                  if (payload.adaptiveEntropy !== undefined && payload.adaptiveEntropy < 1) return <circle key={`a-${props.index}`} cx={cx} cy={cy} r={4} fill="#ffb68d" stroke="none" />;
+                  return <circle key={`a-${props.index}`} cx={cx} cy={cy} r={3} fill="#c1c1ff" stroke="none" />;
                 }}
                 activeDot={{ r: 6 }}
               />
